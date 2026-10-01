@@ -1,0 +1,26 @@
+{
+    "name": "Top.Client.App.Editor",
+    "rootNamespace": "Top.Client.App.Editor",
+    "references": [
+        "Top.Client.App",
+        "Top.Client.Core",
+        "Top.Client.Game",
+        "Top.Client.Models",
+        "Top.Content",
+        "Top.Contracts",
+        "Top.Contracts.Assets",
+        "Top.Contracts.Tables",
+        "Top.Logging"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
