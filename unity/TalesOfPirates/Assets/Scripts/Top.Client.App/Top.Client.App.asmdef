@@ -9,7 +9,8 @@
         "Top.Contracts",
         "Top.Contracts.Assets",
         "Top.Contracts.Tables",
-        "Top.Logging"
+        "Top.Logging",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

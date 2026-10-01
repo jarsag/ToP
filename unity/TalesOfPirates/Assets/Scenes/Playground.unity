@@ -258,6 +258,7 @@ GameObject:
   - component: {fileID: 752627232}
   - component: {fileID: 752627231}
   - component: {fileID: 752627234}
+  - component: {fileID: 752627235}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -383,6 +384,26 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &752627235
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 752627230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ef60c671542d06743906c8aeb7559667, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Top.Client.App::Top.Client.App.FlyCamera
+  _speed: 200
+  _sprint: 5
+  _lookSensitivity: 0.12
+  _wheelStep: 1.25
+  _minSpeed: 1
+  _maxSpeed: 5000
+  _minPitch: -89
+  _maxPitch: 89
 --- !u!1 &766872935
 GameObject:
   m_ObjectHideFlags: 0
@@ -444,10 +465,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Top.Client.App::Top.Client.App.MapPreview
   _mapId: 1
-  _focus: {fileID: 766872936}
+  _focus: {fileID: 752627233}
   _followSceneView: 0
   _sun: {fileID: 81175268}
-  _mapStreamingRadius: 64
+  _mapStreamingRadius: 256
   _shaders: {fileID: 11400000, guid: 50202a3100653574a954ecdd6b520132, type: 2}
 --- !u!4 &1014006410
 Transform:
