@@ -18,6 +18,12 @@ namespace Top.Client.App
         private float _yaw;
         private bool _orbiting;
 
+        /// <summary>
+        /// The object the camera stays behind, so whatever switches camera modes
+        /// can put the world back to streaming around it.
+        /// </summary>
+        public Transform Target => _target;
+
         private void LateUpdate()
         {
             if (_target == null)

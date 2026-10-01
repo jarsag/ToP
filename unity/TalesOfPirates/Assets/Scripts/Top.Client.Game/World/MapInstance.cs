@@ -21,6 +21,17 @@ namespace Top.Client.Game.World
 
             _root = CreateGroup("Map", parent);
 
+            // The map is the world. Its terrain, everything it places, the hero
+            // and the camera are all in world coordinates, and the map region
+            // window builds at the origin too - so this group is only a folder
+            // under whatever holds the preview, and must not inherit that
+            // object's transform. A MapPreview dragged somewhere in the editor
+            // used to take the whole map with it: play mode then built its
+            // terrain a hundred units from where the window showed it, and the
+            // hero stood in an empty scene.
+            _root.position = Vector3.zero;
+            _root.rotation = Quaternion.identity;
+
             _chunkStreamer = new ChunkStreamer(mapData, streamingRadius,
                 new TerrainLoader(mapData, CreateGroup("Terrain", _root), terrainMaterial),
                 new WaterLoader(mapData, CreateGroup("Water", _root), waterMaterial),

@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading;
 using Top.Client.Game;
 using Top.Client.Game.Tables;
@@ -23,6 +22,13 @@ namespace Top.Client.App
         [SerializeField] private float _mapStreamingRadius = 192f;
         [SerializeField] private ShaderSettings _shaders;
 
+        /// <summary>
+        /// The converted tree to read, relative to the repository root unless it
+        /// is absolute. The converter window writes this same field, so what it
+        /// converts is what play mode reads.
+        /// </summary>
+        [SerializeField] private string _contentRoot = ContentRoot.Default;
+
         private TerrainMaterial _terrainMaterial;
         private WaterMaterial _waterMaterial;
         private GameWorld _world;
@@ -33,6 +39,29 @@ namespace Top.Client.App
         /// has finished loading. Anything that walks on the map waits for this.
         /// </summary>
         public MapData Data => _world?.Data;
+
+        /// <summary>
+        /// The object the streamed world is centred on: the hero while the
+        /// camera walks with it, the camera itself while somebody flies free over
+        /// the map. Nothing else moves the centre, so this is what keeps the
+        /// ground under a free camera.
+        /// </summary>
+        public Transform Focus
+        {
+            get { return _focus; }
+            set { _focus = value; }
+        }
+
+        /// <summary>
+        /// The preview in the open scene: the one that owns the shaders and the
+        /// content folder the editor windows and play mode all share.
+        /// </summary>
+        public static MapPreview InScene()
+        {
+            var previews = FindObjectsByType<MapPreview>();
+
+            return previews.Length > 0 ? previews[0] : null;
+        }
 
         private void OnEnable()
         {
@@ -72,8 +101,7 @@ namespace Top.Client.App
                 return;
             }
 
-            // TODO: Temp
-            var contentRoot = Path.Combine(Application.dataPath, "..", "..", "..", "artifacts", "content");
+            var contentRoot = ContentRoot.Resolve(_contentRoot);
             var cancellationTokenSource = new CancellationTokenSource();
 
             _cancellationTokenSource = cancellationTokenSource;

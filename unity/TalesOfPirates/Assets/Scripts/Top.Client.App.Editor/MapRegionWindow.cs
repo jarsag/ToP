@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Top.Client.App;
@@ -11,6 +10,7 @@ using Top.Client.Game.World.Water;
 using Top.Content;
 using Top.Contracts.Tables.World;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -39,17 +39,23 @@ namespace Top.Client.App.Editor
         private const string RootName = "Map region (preview)";
 
         /// <summary>
-        /// The same tree the runtime reads, resolved from Assets the way
-        /// MapPreview resolves it.
+        /// The tree to read, relative to the repository root unless it is
+        /// absolute - the same field the MapPreview in the scene carries, which
+        /// the converter window writes.
         /// </summary>
-        private const string DefaultContentRoot = "../../../artifacts/content";
-
-        [SerializeField] private string _contentRoot = DefaultContentRoot;
+        [SerializeField] private string _contentRoot = ContentRoot.Default;
         [SerializeField] private int _mapId = 32;
         [SerializeField] private Vector2Int _from = Vector2Int.zero;
         [SerializeField] private Vector2Int _to = new Vector2Int(1, 1);
 
         private readonly List<Vector2Int> _loaded = new List<Vector2Int>();
+
+        /// <summary>
+        /// The map the scene's MapPreview loads, so the window can say when the
+        /// one on screen is not the one play mode would build.
+        /// </summary>
+        private int _sceneMapId;
+        private bool _sceneMapKnown;
 
         private TableSet _tables;
         private TerrainMaterial _terrain;
@@ -91,6 +97,157 @@ namespace Top.Client.App.Editor
         private void OnEnable()
         {
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
+
+            AdoptScene();
+        }
+
+        /// <summary>
+        /// Follows the scene again whenever the window is come back to, so what
+        /// the converter window has since written is what this one reads without
+        /// the window being closed and opened.
+        /// </summary>
+        private void OnFocus()
+        {
+            AdoptScene();
+        }
+
+        /// <summary>
+        /// Starts from what the MapPreview in the scene reads - the content
+        /// folder and the map - so the window and play mode look at the same
+        /// thing without anybody typing it twice. What this window shows is
+        /// still its own to choose; it only starts where the scene is.
+        /// </summary>
+        private void AdoptScene()
+        {
+            var preview = MapPreview.InScene();
+
+            if (preview == null)
+            {
+                _sceneMapKnown = false;
+
+                return;
+            }
+
+            var serialized = new SerializedObject(preview);
+            var root = serialized.FindProperty("_contentRoot")?.stringValue;
+            var map = serialized.FindProperty("_mapId");
+
+            if (!string.IsNullOrEmpty(root))
+            {
+                _contentRoot = root;
+            }
+
+            if (map != null)
+            {
+                _sceneMapId = map.intValue;
+                _sceneMapKnown = true;
+            }
+        }
+
+        /// <summary>
+        /// Says which map the scene will actually load, and offers to make it the
+        /// one on screen. The two are separate - this window reads the map table,
+        /// play mode reads the MapPreview - and a hero placed on the terrain of
+        /// one stands on nothing in the other.
+        /// </summary>
+        private void DrawSceneMap()
+        {
+            if (!_sceneMapKnown)
+            {
+                EditorGUILayout.HelpBox("the open scene has no MapPreview to take the folder and map from",
+                    MessageType.Info);
+
+                return;
+            }
+
+            if (_sceneMapId == _mapId)
+            {
+                EditorGUILayout.LabelField("The scene loads this map", EditorStyles.miniLabel);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox($"The scene loads map {_sceneMapId}, not {_mapId}: play mode would " +
+                                        "load a different map than the one on screen.", MessageType.Warning);
+
+                if (GUILayout.Button($"Make the scene load map {_mapId}"))
+                {
+                    WriteMapToScene();
+                }
+            }
+
+            DrawMapObject();
+        }
+
+        /// <summary>
+        /// The object the preview sits on is only a folder. The map builds at the
+        /// world coordinates the data has, which is where this window draws it,
+        /// so an object left somewhere else is harmless - but it reads as if it
+        /// mattered, and it is what made the two views disagree. This offers to
+        /// put it back where it says nothing.
+        /// </summary>
+        private void DrawMapObject()
+        {
+            var preview = MapPreview.InScene();
+
+            if (preview == null)
+            {
+                return;
+            }
+
+            var position = preview.transform.position;
+
+            if (position == Vector3.zero)
+            {
+                EditorGUILayout.LabelField("The Map object is at the origin, where the map builds",
+                    EditorStyles.miniLabel);
+
+                return;
+            }
+
+            EditorGUILayout.LabelField($"The Map object sits at ({position.x:0.#}, {position.y:0.#}, " +
+                                       $"{position.z:0.#}) - it does not move the map", EditorStyles.miniLabel);
+
+            if (GUILayout.Button("Put the Map object back at the origin"))
+            {
+                Undo.RecordObject(preview.transform, "Zero the map preview object");
+
+                preview.transform.position = Vector3.zero;
+                preview.transform.rotation = Quaternion.identity;
+
+                EditorUtility.SetDirty(preview);
+                EditorSceneManager.MarkSceneDirty(preview.gameObject.scene);
+
+                _status = "the Map object is at the origin - the map was already built there";
+            }
+        }
+
+        /// <summary>
+        /// Points the scene's MapPreview at the map this window is showing, so
+        /// pressing play loads what was just being looked at. Nothing does this
+        /// by itself: the window reads the scene, it does not steer it.
+        /// </summary>
+        private void WriteMapToScene()
+        {
+            var preview = MapPreview.InScene();
+            var serialized = preview == null ? null : new SerializedObject(preview);
+            var field = serialized?.FindProperty("_mapId");
+
+            if (field == null)
+            {
+                _status = "no MapPreview in the open scene";
+
+                return;
+            }
+
+            field.intValue = _mapId;
+            serialized.ApplyModifiedProperties();
+
+            EditorUtility.SetDirty(preview);
+            EditorSceneManager.MarkSceneDirty(preview.gameObject.scene);
+
+            _sceneMapId = _mapId;
+            _sceneMapKnown = true;
+            _status = $"the scene's MapPreview now loads map {_mapId}";
         }
 
         private void OnDisable()
@@ -174,7 +331,7 @@ namespace Top.Client.App.Editor
 
             if (GUILayout.Button("Default", GUILayout.Width(70f)))
             {
-                _contentRoot = DefaultContentRoot;
+                _contentRoot = ContentRoot.Default;
                 _tables = null;
             }
 
@@ -209,6 +366,8 @@ namespace Top.Client.App.Editor
             {
                 _mapId = maps[picked].Id;
             }
+
+            DrawSceneMap();
         }
 
         private async void LoadTables()
@@ -306,7 +465,8 @@ namespace Top.Client.App.Editor
                 Frame(root);
 
                 _status = $"{entry.Name}: {data.Width}x{data.Height} tiles, " +
-                          $"{data.ChunkCountX}x{data.ChunkCountY} chunks. Built {_loaded.Count}.";
+                          $"{data.ChunkCountX}x{data.ChunkCountY} chunks, built {_loaded.Count}.\n" +
+                          $"World {Bounds(data, from, to)}.\n{FocusLine()}";
             }
             catch (Exception exception)
             {
@@ -376,7 +536,7 @@ namespace Top.Client.App.Editor
 
         private IContentSource Source()
         {
-            return new FolderContentSource(Path.GetFullPath(Path.Combine(Application.dataPath, _contentRoot)));
+            return new FolderContentSource(ContentRoot.Resolve(_contentRoot));
         }
 
         /// <summary>
@@ -386,17 +546,10 @@ namespace Top.Client.App.Editor
         /// </summary>
         private static ShaderSettings Shaders()
         {
-            foreach (var preview in FindObjectsByType<MapPreview>())
-            {
-                var field = new SerializedObject(preview).FindProperty("_shaders");
+            var preview = MapPreview.InScene();
+            var field = preview == null ? null : new SerializedObject(preview).FindProperty("_shaders");
 
-                if (field?.objectReferenceValue is ShaderSettings settings)
-                {
-                    return settings;
-                }
-            }
-
-            return null;
+            return field?.objectReferenceValue as ShaderSettings;
         }
 
         private static Vector2Int Clamp(Vector2Int chunk, MapData data, int minimum)
@@ -457,6 +610,43 @@ namespace Top.Client.App.Editor
             group.transform.SetParent(parent, worldPositionStays: false);
 
             return group.transform;
+        }
+
+        /// <summary>
+        /// Where the built region is in world coordinates. The map is the world
+        /// - the runtime builds it at these same numbers - so this line is what
+        /// makes the two comparable instead of a guess.
+        /// </summary>
+        private static string Bounds(MapData data, Vector2Int from, Vector2Int to)
+        {
+            var near = MapSpace.ToWorld(from.x * data.ChunkSize, from.y * data.ChunkSize, 0f);
+            var far = MapSpace.ToWorld((to.x + 1) * data.ChunkSize, (to.y + 1) * data.ChunkSize, 0f);
+
+            return $"x {Mathf.Min(near.x, far.x)}..{Mathf.Max(near.x, far.x)}, " +
+                   $"z {Mathf.Min(near.z, far.z)}..{Mathf.Max(near.z, far.z)}";
+        }
+
+        /// <summary>
+        /// Where the object the preview follows stands, in map units as well as
+        /// world ones, so a hero standing off the map - or in a chunk nobody
+        /// built - is a number rather than a mystery. Not called Focus: that is
+        /// an EditorWindow method and hiding it is a trap.
+        /// </summary>
+        private static string FocusLine()
+        {
+            var preview = MapPreview.InScene();
+            var field = preview == null ? null : new SerializedObject(preview).FindProperty("_focus");
+            var focus = field?.objectReferenceValue as Transform;
+
+            if (focus == null)
+            {
+                return "no focus object to follow";
+            }
+
+            var point = MapSpace.ToMap(focus.position);
+
+            return $"follows '{focus.name}' at map ({point.x:0.#}, {point.y:0.#}), " +
+                   $"world ({focus.position.x:0.#}, {focus.position.y:0.#}, {focus.position.z:0.#})";
         }
 
         private static GameObject FindRoot()

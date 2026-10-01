@@ -164,6 +164,70 @@ namespace Top.Conversion.Pipeline
             return text != null && text.Contains(filter, comparison);
         }
 
+        /// <summary>
+        /// The one entry a unit names: the id where the family numbers its
+        /// units, the name without case where it does not. A map answers to
+        /// both - its mapinfo id and the stem of its file - because the first
+        /// is what the scene loads it by and the second is what its converter
+        /// keys it by. A family that cannot be read at all reports its own
+        /// trouble rather than an empty search.
+        /// </summary>
+        public bool TryFind(string kind, string unit, out CatalogEntry entry, out string trouble)
+        {
+            entry = null;
+
+            if (!ContentKind.IsKnown(kind))
+            {
+                trouble = $"no family named '{kind}'";
+
+                return false;
+            }
+
+            var section = Section(kind);
+
+            if (!section.Available)
+            {
+                trouble = section.Trouble;
+
+                return false;
+            }
+
+            var text = unit == null ? string.Empty : unit.Trim();
+
+            if (text.Length == 0)
+            {
+                trouble = $"no {kind} named";
+
+                return false;
+            }
+
+            if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) && id != 0)
+            {
+                entry = section.Entries.FirstOrDefault(candidate => candidate.Id == id);
+
+                if (entry != null)
+                {
+                    trouble = null;
+
+                    return true;
+                }
+            }
+
+            entry = section.Entries.FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, text, StringComparison.OrdinalIgnoreCase));
+
+            if (entry != null)
+            {
+                trouble = null;
+
+                return true;
+            }
+
+            trouble = $"no {kind} named '{text}'";
+
+            return false;
+        }
+
         private CatalogSection Characters()
         {
             var path = _settings.Source.Table("characterinfo.txt");
@@ -249,29 +313,39 @@ namespace Top.Conversion.Pipeline
             var entries = Directory.GetFiles(folder, "*.map")
                 .Select(Path.GetFileNameWithoutExtension)
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                .Select(name => new CatalogEntry(ContentKind.Map, 0, name, Map(name)))
+                .Select(Map)
                 .ToList();
 
             return Filled(ContentKind.Map, entries, folder);
         }
 
         /// <summary>
-        /// The display name and mapinfo id behind a .map file, so a chooser
-        /// shows "Ascaron" where the file is called "garner".
+        /// One .map file as an entry. The id is the mapinfo row's, because that
+        /// is the number a client loads a map by - the preview in the scene
+        /// carries the same one - while the name stays the stem of the file,
+        /// which is the key the map converter takes.
         /// </summary>
-        private string Map(string name)
+        private CatalogEntry Map(string name)
         {
-            var row = _tables.Maps?.FirstOrDefault(record =>
+            var row = Row(name);
+
+            return new CatalogEntry(ContentKind.Map, row?.Id ?? 0, name, Display(row));
+        }
+
+        private MapInfoRecord Row(string name)
+        {
+            return _tables.Maps?.FirstOrDefault(record =>
                 string.Equals(record.Name, name, StringComparison.OrdinalIgnoreCase));
+        }
 
-            if (row == null)
-            {
-                return null;
-            }
-
-            var display = string.IsNullOrEmpty(row.DisplayName) ? null : row.DisplayName;
-
-            return display == null ? $"mapinfo {row.Id}" : $"{display}, mapinfo {row.Id}";
+        /// <summary>
+        /// What mapinfo calls a map, so a chooser shows "Ascaron" where the
+        /// file is called "garner". The id leads the label, so it is not
+        /// repeated here.
+        /// </summary>
+        private static string Display(MapInfoRecord row)
+        {
+            return string.IsNullOrEmpty(row?.DisplayName) ? null : row.DisplayName;
         }
 
         private CatalogSection Tables()

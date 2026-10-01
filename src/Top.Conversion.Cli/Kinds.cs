@@ -67,6 +67,25 @@ namespace Top.Conversion.Cli
             }
         }
 
+        /// <summary>
+        /// The scene objects a converted map places, one unit each. A client
+        /// holds thousands of them and a map names a handful, so these are the
+        /// ones worth converting along with the map - the rest would be a
+        /// family the map never mentions.
+        /// </summary>
+        internal static IEnumerable<UnitResult> Objects(MapResult map, ConversionPipeline pipeline,
+            IProgress<ConversionProgress> progress = null)
+        {
+            var index = 0;
+
+            foreach (var id in map.Objects)
+            {
+                progress?.Report(new ConversionProgress($"scene object {id}", ++index, map.Objects.Count));
+
+                yield return pipeline.SceneObjects.Convert(id);
+            }
+        }
+
         private static TableResult Table(CatalogEntry entry, ConversionPipeline pipeline)
         {
             var unit = pipeline.Tables.Units

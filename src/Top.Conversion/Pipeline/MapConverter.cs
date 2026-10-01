@@ -10,10 +10,17 @@ using Original = Top.Legacy.MindPower.World;
 namespace Top.Conversion.Pipeline
 {
     /// <summary>
-    /// What converting one map came to.
+    /// What converting one map came to, and what stands on it.
     /// </summary>
     public class MapResult(string name, ConversionOutcome outcome) : UnitResult(0, name, outcome)
     {
+        /// <summary>
+        /// The sceneobjinfo ids the map places as models: what has to be
+        /// converted before the map is worth standing in. Empty for a map that
+        /// failed, was skipped, or stands on nothing.
+        /// </summary>
+        public IReadOnlyList<int> Objects { get; init; } = [];
+
         public override IEnumerable<ModelArtifact> Artifacts => [];
     }
 
@@ -46,13 +53,14 @@ namespace Top.Conversion.Pipeline
             Log.Info($"converting map '{name}'");
 
             var map = new MapBuilder(ReadTerrain(terrainPath), ReadObjects(name), tables.Terrain).Build();
+            var objects = Placed(map);
 
             Directory.CreateDirectory(Path.GetDirectoryName(path));
 
             Write(map, path);
             _textureWriter.Write(tables.Terrain);
 
-            return new MapResult(name, ConversionOutcome.Converted);
+            return new MapResult(name, ConversionOutcome.Converted) { Objects = objects };
         }
 
         public IEnumerable<MapResult> ConvertAll(IProgress<ConversionProgress> progress = null,
@@ -121,6 +129,56 @@ namespace Top.Conversion.Pipeline
             using var stream = File.OpenRead(path);
 
             return Original.ObjFile.Read(stream);
+        }
+
+        /// <summary>
+        /// The scene objects a built map places, distinct and in order. A map
+        /// names each one by its sceneobjinfo id, and a client holds thousands
+        /// of rows a given map never mentions, so a map brings exactly these
+        /// along and no more. An id the table does not know is dropped here
+        /// rather than converted into an error.
+        /// </summary>
+        private IReadOnlyList<int> Placed(Contracts.Assets.Maps.MapFile map)
+        {
+            var ids = new SortedSet<int>();
+
+            foreach (var chunk in map.Chunks)
+            {
+                if (chunk?.Placements == null)
+                {
+                    continue;
+                }
+
+                foreach (var placement in chunk.Placements)
+                {
+                    if (placement.Kind == Contracts.Assets.Maps.PlacementKind.Model && placement.Id > 0)
+                    {
+                        ids.Add(placement.Id);
+                    }
+                }
+            }
+
+            // Without the table there is nothing to check an id against, so a
+            // client that ships no sceneobjinfo keeps every id the map names.
+            if (tables.SceneObjects == null)
+            {
+                return ids.ToList();
+            }
+
+            var known = ids.Where(Known).ToList();
+            var dropped = ids.Count - known.Count;
+
+            if (dropped > 0)
+            {
+                Log.Warning($"dropped {dropped} placed objects naming no sceneobjinfo row");
+            }
+
+            return known;
+        }
+
+        private bool Known(int id)
+        {
+            return tables.SceneObjects.TryGetById(id, out var row) && !string.IsNullOrEmpty(row.Name);
         }
     }
 }

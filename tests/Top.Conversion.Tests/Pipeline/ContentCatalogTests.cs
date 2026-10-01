@@ -129,9 +129,10 @@ namespace Top.Conversion.Tests.Pipeline
             var entry = Catalog(maps: [Map(1, "garner", "Ascaron")]).Section(ContentKind.Map)
                 .Entries.Single();
 
+            Assert.That(entry.Id, Is.EqualTo(1));
             Assert.That(entry.Name, Is.EqualTo("garner"));
-            Assert.That(entry.Detail, Is.EqualTo("Ascaron, mapinfo 1"));
-            Assert.That(entry.Label, Is.EqualTo("garner  -  Ascaron, mapinfo 1"));
+            Assert.That(entry.Detail, Is.EqualTo("Ascaron"));
+            Assert.That(entry.Label, Is.EqualTo("    1  garner  -  Ascaron"));
         }
 
         [Test]
@@ -256,6 +257,73 @@ namespace Top.Conversion.Tests.Pipeline
             Assert.That(entries.Select(entry => entry.Name),
                 Is.EqualTo(new[] { "sceneobjects", "terrains", "maps" }));
             Assert.That(entries.All(entry => entry.Id == 0 && entry.Detail.Length > 0), Is.True);
+        }
+
+        [Test]
+        public void AUnitIsFoundByItsId()
+        {
+            var catalog = Catalog(
+                characters: [Character(7, "Long Haired Guy", CharacterModalType.MainCharacter, 1)]);
+
+            Assert.That(catalog.TryFind(ContentKind.Character, "7", out var entry, out var trouble), Is.True);
+            Assert.That(entry.Name, Is.EqualTo("Long Haired Guy"));
+            Assert.That(trouble, Is.Null);
+        }
+
+        [Test]
+        public void AUnitIsFoundByNameWithoutCase()
+        {
+            _client.AddMap("garner", LegacyMaps.FilledTerrain(LegacyMaps.NewFormat, 8, 8));
+
+            var catalog = Catalog(maps: [Map(1, "garner", "Ascaron")]);
+
+            Assert.That(catalog.TryFind(ContentKind.Map, "GARNER", out var entry, out var trouble), Is.True);
+            Assert.That(entry.Name, Is.EqualTo("garner"));
+            Assert.That(entry.Id, Is.EqualTo(1));
+            Assert.That(trouble, Is.Null);
+        }
+
+        [Test]
+        public void AMapIsFoundByItsMapInfoId()
+        {
+            _client.AddMap("garner", LegacyMaps.FilledTerrain(LegacyMaps.NewFormat, 8, 8));
+            _client.AddMap("stray", LegacyMaps.FilledTerrain(LegacyMaps.NewFormat, 8, 8));
+
+            var catalog = Catalog(maps: [Map(9, "garner", "Ascaron")]);
+
+            // The id is what the scene loads a map by, the name is what the
+            // converter keys it by, and either finds it.
+            Assert.That(catalog.TryFind(ContentKind.Map, "9", out var entry, out _), Is.True);
+            Assert.That(entry.Name, Is.EqualTo("garner"));
+
+            // A file mapinfo never names has no id, so only its name finds it.
+            Assert.That(catalog.TryFind(ContentKind.Map, "stray", out var stray, out _), Is.True);
+            Assert.That(stray.Id, Is.Zero);
+        }
+
+        [Test]
+        public void AnUnknownUnitSaysWhatIsMissing()
+        {
+            var catalog = Catalog(
+                characters: [Character(7, "Long Haired Guy", CharacterModalType.MainCharacter, 1)]);
+
+            Assert.That(catalog.TryFind(ContentKind.Character, "99", out var entry, out var trouble), Is.False);
+            Assert.That(entry, Is.Null);
+            Assert.That(trouble, Does.Contain("99"));
+        }
+
+        [Test]
+        public void AFamilyThatCannotBeReadReportsItsOwnTrouble()
+        {
+            Assert.That(Catalog().TryFind(ContentKind.Character, "1", out _, out var trouble), Is.False);
+            Assert.That(trouble, Does.Contain("characterinfo.txt"));
+        }
+
+        [Test]
+        public void AnUnknownFamilyIsRefusedRatherThanThrown()
+        {
+            Assert.That(Catalog().TryFind("nonsense", "1", out _, out var trouble), Is.False);
+            Assert.That(trouble, Does.Contain("nonsense"));
         }
 
         private static IReadOnlyList<int> Names(ContentCatalog catalog, string kind, string filter)

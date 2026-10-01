@@ -26,6 +26,12 @@ namespace Top.Conversion.Cli
         private readonly string _output;
 
         /// <summary>
+        /// Whether a map picked here brings the objects standing on it, which
+        /// is what the command line's --no-objects turns off.
+        /// </summary>
+        private readonly bool _objects;
+
+        /// <summary>
         /// The kinds this session has already emitted in full, so a run that
         /// needs one does not write it again for every unit picked.
         /// </summary>
@@ -33,11 +39,12 @@ namespace Top.Conversion.Cli
 
         private string _source;
 
-        internal Wizard(ConsolePrompt prompt, string near, string output)
+        internal Wizard(ConsolePrompt prompt, string near, string output, bool objects)
         {
             _prompt = prompt;
             _near = near;
             _output = output;
+            _objects = objects;
         }
 
         /// <summary>
@@ -301,21 +308,21 @@ namespace Top.Conversion.Cli
         }
 
         /// <summary>
-        /// The one unit a catalog entry names, plus whatever that unit cannot
-        /// be read without.
+        /// The one unit a catalog entry names, the objects standing on it when
+        /// that unit is a map, plus whatever the unit cannot be read without.
         /// </summary>
         private int Convert(CatalogEntry entry, ConversionPipeline pipeline)
         {
-            var run = new KindRun(entry.Kind);
+            var failed = 0;
 
-            foreach (var result in Kinds.One(entry, pipeline))
+            foreach (var run in EntryRun.Convert(entry, pipeline, _objects))
             {
-                run.Add(result);
+                _prompt.Line(run.Summary);
+
+                failed += run.Failed;
             }
 
-            _prompt.Line(run.Summary);
-
-            return run.Failed;
+            return failed;
         }
 
         /// <summary>

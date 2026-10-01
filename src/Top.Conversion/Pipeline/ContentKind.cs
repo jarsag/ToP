@@ -19,6 +19,23 @@ namespace Top.Conversion.Pipeline
 
         public const string Map = "map";
 
+        /// <summary>
+        /// Every family, in the order a chooser offers them.
+        /// </summary>
+        public static readonly IReadOnlyList<string> Everything = new[]
+        {
+            Character, Item, Scene, Map, Table
+        };
+
+        /// <summary>
+        /// Whether a name is one of the families, so a name typed on a command
+        /// line can be refused before anything tries to read a client.
+        /// </summary>
+        public static bool IsKnown(string kind)
+        {
+            return kind == Character || kind == Item || kind == Scene || kind == Map || kind == Table;
+        }
+
         private static readonly IReadOnlyList<string> Nothing = Array.Empty<string>();
 
         private static readonly IReadOnlyList<string> Tables = new[] { Table };

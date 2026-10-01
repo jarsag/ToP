@@ -532,5 +532,58 @@ namespace Top.Conversion.Tests.Pipeline
             Assert.That(progress.Steps.Select(step => step.Unit),
                 Is.EqualTo(new[] { "map first", "map second" }));
         }
+
+        [Test]
+        public void A_map_lists_the_objects_standing_on_it()
+        {
+            var terrain = LegacyMaps.FilledTerrain(LegacyMaps.NewFormat, 128, 64);
+
+            var objects = LegacyMaps.Objects(128, 64);
+            objects.Sections[0] = new Original.ObjSection
+            {
+                Objects = [LegacyMaps.Model(501, 250, 700, 0, 0), LegacyMaps.Model(501, 300, 700, 0, 0)]
+            };
+            objects.Sections[8] = new Original.ObjSection { Objects = [LegacyMaps.Effect(12, 600, 500, 0, 0)] };
+
+            _client.AddMap("shore", terrain, objects);
+
+            var result = Converter().Convert("shore");
+
+            Assert.That(result.Outcome, Is.EqualTo(ConversionOutcome.Converted));
+            Assert.That(result.Objects, Is.EqualTo(new[] { 501 }),
+                "an object placed twice is one unit to convert, and an effect is no model at all");
+        }
+
+        [Test]
+        public void A_map_with_no_objects_lists_none()
+        {
+            _client.AddMap("bare", LegacyMaps.FilledTerrain(LegacyMaps.NewFormat, 64, 64));
+
+            Assert.That(Converter().Convert("bare").Objects, Is.Empty);
+        }
+
+        [Test]
+        public void A_placed_object_the_table_does_not_know_is_dropped()
+        {
+            var terrain = LegacyMaps.FilledTerrain(LegacyMaps.NewFormat, 64, 64);
+
+            var objects = LegacyMaps.Objects(64, 64);
+            objects.Sections[0] = new Original.ObjSection
+            {
+                Objects = [LegacyMaps.Model(501, 100, 100, 0, 0), LegacyMaps.Model(999, 200, 200, 0, 0)]
+            };
+
+            _client.AddMap("town", terrain, objects);
+
+            var tables = new ClientTables(null, null,
+                new Table<SceneObjectInfoRecord>(
+                    [new SceneObjectInfoRecord { Id = 501, Name = "stone01.lgo", Type = 1 }]),
+                null);
+
+            var result = new MapConverter(_client.Settings(), tables).Convert("town");
+
+            Assert.That(result.Objects, Is.EqualTo(new[] { 501 }),
+                "an id the table has no row for is not a unit anything can convert");
+        }
     }
 }

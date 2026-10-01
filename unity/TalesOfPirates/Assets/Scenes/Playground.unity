@@ -335,7 +335,7 @@ Transform:
   m_GameObject: {fileID: 752627230}
   serializedVersion: 2
   m_LocalRotation: {x: 0.38268346, y: 0, z: 0, w: 0.9238795}
-  m_LocalPosition: {x: -50, y: 40, z: 50}
+  m_LocalPosition: {x: -55.3, y: 42.4, z: 47.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -481,12 +481,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 935a31bbd74f68f4bb2fa692994694af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Top.Client.App::Top.Client.App.MapPreview
-  _mapId: 32
+  _mapId: 1
   _focus: {fileID: 1959073039}
   _followSceneView: 0
   _sun: {fileID: 81175268}
   _mapStreamingRadius: 256
   _shaders: {fileID: 11400000, guid: 50202a3100653574a954ecdd6b520132, type: 2}
+  _contentRoot: artifacts/content
 --- !u!4 &1014006410
 Transform:
   m_ObjectHideFlags: 0
@@ -587,7 +588,7 @@ Transform:
   m_GameObject: {fileID: 1959073035}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -50, y: 5, z: 50}
+  m_LocalPosition: {x: -2222.23, y: 3.08, z: 2787.47}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
