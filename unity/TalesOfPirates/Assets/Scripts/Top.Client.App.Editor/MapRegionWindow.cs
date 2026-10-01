@@ -386,7 +386,7 @@ namespace Top.Client.App.Editor
         /// </summary>
         private static ShaderSettings Shaders()
         {
-            foreach (var preview in FindObjectsByType<MapPreview>(FindObjectsSortMode.None))
+            foreach (var preview in FindObjectsByType<MapPreview>())
             {
                 var field = new SerializedObject(preview).FindProperty("_shaders");
 
