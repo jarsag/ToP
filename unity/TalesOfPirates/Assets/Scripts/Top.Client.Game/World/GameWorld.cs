@@ -24,6 +24,11 @@ namespace Top.Client.Game.World
 
         public MapEntry Map => _mapInstance?.MapEntry;
 
+        /// <summary>
+        /// The loaded map's terrain and attribute data, null until a map is up.
+        /// </summary>
+        public MapData Data => _mapInstance?.Data;
+
         public async Task SetMap(int mapId, CancellationToken cancellationToken = default)
         {
             var mapInstance = await _mapFactory.Instantiate(mapId, _root, cancellationToken);

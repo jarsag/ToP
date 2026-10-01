@@ -9,6 +9,7 @@ namespace Top.Client.Game.World
     public class MapInstance : IDisposable
     {
         private readonly ChunkStreamer _chunkStreamer;
+        private readonly MapData _mapData;
 
         private Transform _root;
 
@@ -16,6 +17,7 @@ namespace Top.Client.Game.World
             Material waterMaterial, ISceneObjectFactory sceneObjectFactory, float streamingRadius)
         {
             MapEntry = mapEntry;
+            _mapData = mapData;
 
             _root = CreateGroup("Map", parent);
 
@@ -27,6 +29,12 @@ namespace Top.Client.Game.World
         }
 
         public MapEntry MapEntry { get; }
+
+        /// <summary>
+        /// The map's terrain and attribute data, for anything that needs to
+        /// stand on it rather than only look at it.
+        /// </summary>
+        public MapData Data => _mapData;
 
         public void SetCenter(Vector3 worldPosition)
         {

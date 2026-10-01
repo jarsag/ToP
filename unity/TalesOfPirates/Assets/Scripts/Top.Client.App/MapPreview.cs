@@ -28,6 +28,12 @@ namespace Top.Client.App
         private GameWorld _world;
         private CancellationTokenSource _cancellationTokenSource;
 
+        /// <summary>
+        /// The loaded map's terrain and attribute data, null until the preview
+        /// has finished loading. Anything that walks on the map waits for this.
+        /// </summary>
+        public MapData Data => _world?.Data;
+
         private void OnEnable()
         {
             Load();
