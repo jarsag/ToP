@@ -22,9 +22,13 @@ namespace Top.Conversion.Pipeline
 
         public string Maps => Path.Combine(_root, "map");
 
+        public string Tables => Path.Combine(_root, "scripts", "table");
+
         public string CharacterAction => Path.Combine(_root, "scripts", "txt", "CharacterAction.tx");
 
-        public string Model(string folder, string fileName) => Path.Combine(Models, folder, fileName);
+        public string ModelDir(string folder) => Path.Combine(Models, folder);
+
+        public string Model(string folder, string fileName) => Path.Combine(ModelDir(folder), fileName);
 
         public string MapTerrain(string name) => Path.Combine(Maps, name + ".map");
 
@@ -36,6 +40,6 @@ namespace Top.Conversion.Pipeline
 
         public string Skeleton(string name) => Path.Combine(Animations, name + ".lab");
 
-        public string Table(string name) => Path.Combine(_root, "scripts", "table", name);
+        public string Table(string name) => Path.Combine(Tables, name);
     }
 }

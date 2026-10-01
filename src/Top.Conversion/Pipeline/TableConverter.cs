@@ -30,6 +30,11 @@ namespace Top.Conversion.Pipeline
             new MapTableUnit(tables)
         ];
 
+        /// <summary>
+        /// The tables a run emits, in the order it emits them.
+        /// </summary>
+        public IReadOnlyList<ITableUnit> Units => _units;
+
         public TableResult Convert(ITableUnit unit)
         {
             var entries = unit.Entries();

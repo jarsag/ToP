@@ -20,23 +20,34 @@ namespace Top.Conversion.Cli
         ];
 
         public static readonly string Usage = $"""
-            usage: Top.Conversion.Cli [--source <dir>] [--out <dir>] [--kinds <list>]
+            usage: Top.Conversion.Cli [--source <dir>] [--out <dir>] [--kinds <list>] [--pick|--no-pick]
 
               --source <dir>  original client root, default {DefaultSource}
               --out <dir>     converted tree root, default {DefaultOutput}
               --kinds <list>  comma separated, any of {string.Join(", ", EveryKind)}. Default all
+              --pick          ask which client, category and unit to convert
+              --no-pick       never ask, even with no other argument
               --help, -h      this text
 
-            Relative paths resolve against the current directory. A run overwrites what is
-            already in the tree - delete the tree root first for a clean one.
+            With no argument at all this asks, so a client can be browsed without
+            knowing its layout. Naming a client, an output or a kind converts
+            straight away instead. Relative paths resolve against the current
+            directory. A run overwrites what is already in the tree - delete the
+            tree root first for a clean one.
+
+            A reader opens the client's tables before anything else, so naming
+            map converts the table family too: without it the tree holds a map
+            that nothing can name. A map's placed objects additionally need the
+            scene family - without it only the terrain shows.
 
             """;
 
-        private Arguments(string source, string output, IReadOnlyList<string> kinds)
+        private Arguments(string source, string output, IReadOnlyList<string> kinds, bool? pick)
         {
             Source = source;
             Output = output;
             Kinds = kinds;
+            Pick = pick;
         }
 
         public string Source { get; }
@@ -45,11 +56,18 @@ namespace Top.Conversion.Cli
 
         public IReadOnlyList<string> Kinds { get; }
 
+        /// <summary>
+        /// Whether to run the wizard: true when asked for, false when refused,
+        /// null when the command line does not say and the default applies.
+        /// </summary>
+        public bool? Pick { get; }
+
         public static bool TryParse(IReadOnlyList<string> args, out Arguments arguments, out string error)
         {
             var source = DefaultSource;
             var output = DefaultOutput;
             IReadOnlyList<string> kinds = EveryKind;
+            bool? pick = null;
 
             arguments = null;
             error = null;
@@ -85,6 +103,16 @@ namespace Top.Conversion.Cli
 
                         break;
 
+                    case "--pick":
+                        pick = true;
+
+                        break;
+
+                    case "--no-pick":
+                        pick = false;
+
+                        break;
+
                     default:
                         error = $"unknown argument '{name}'";
 
@@ -92,7 +120,7 @@ namespace Top.Conversion.Cli
                 }
             }
 
-            arguments = new Arguments(source, output, kinds);
+            arguments = new Arguments(source, output, kinds, pick);
 
             return true;
         }

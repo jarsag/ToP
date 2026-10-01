@@ -30,14 +30,27 @@ namespace Top.Conversion.Cli
                 return 2;
             }
 
+            Log.Writer = new ConsoleLog();
+
+            // Asking is the default only when nothing at all was asked for and
+            // somebody is there to answer: an empty command line on a terminal
+            // opens the wizard, and the same command line in a script keeps
+            // converting the whole default tree as it always did.
+            var interactive = arguments.Pick ?? (args.Length == 0 && ConsolePrompt.CanPrompt);
+
+            if (interactive)
+            {
+                var prompt = new ConsolePrompt(Console.In, Console.Out);
+
+                return new Wizard(prompt, Directory.GetCurrentDirectory(), arguments.Output).Run();
+            }
+
             if (!Directory.Exists(arguments.Source))
             {
                 Console.Error.WriteLine($"no client root at '{Path.GetFullPath(arguments.Source)}'");
 
                 return 2;
             }
-
-            Log.Writer = new ConsoleLog();
 
             return Report(Convert(arguments));
         }
@@ -51,7 +64,18 @@ namespace Top.Conversion.Cli
             Console.WriteLine($"from {Path.GetFullPath(arguments.Source)}");
             Console.WriteLine($"to   {Path.GetFullPath(arguments.Output)}");
 
+            var kinds = ContentKind.Expand(arguments.Kinds);
+
             foreach (var kind in arguments.Kinds)
+            {
+                foreach (var required in ContentKind.Requires(kind).Where(needed =>
+                             !arguments.Kinds.Contains(needed)))
+                {
+                    Console.WriteLine($"note: {kind} cannot be read without {required}, converting it too");
+                }
+            }
+
+            foreach (var kind in kinds)
             {
                 var run = new KindRun(kind);
 
@@ -61,7 +85,7 @@ namespace Top.Conversion.Cli
 
                 try
                 {
-                    foreach (var result in Units(kind, pipeline, run))
+                    foreach (var result in Kinds.All(kind, pipeline, run))
                     {
                         run.Add(result);
                     }
@@ -85,20 +109,6 @@ namespace Top.Conversion.Cli
             }
 
             return runs;
-        }
-
-        private static IEnumerable<UnitResult> Units(string kind, ConversionPipeline pipeline,
-            IProgress<ConversionProgress> progress)
-        {
-            return kind switch
-            {
-                ContentKind.Character => pipeline.Characters.ConvertAll(progress),
-                ContentKind.Item => pipeline.Items.ConvertAll(progress),
-                ContentKind.Scene => pipeline.SceneObjects.ConvertAll(progress),
-                ContentKind.Table => pipeline.Tables.ConvertAll(progress),
-                ContentKind.Map => pipeline.Maps.ConvertAll(progress),
-                _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
-            };
         }
 
         private static int Report(IReadOnlyList<KindRun> runs)
