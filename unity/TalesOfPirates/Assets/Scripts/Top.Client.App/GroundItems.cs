@@ -30,6 +30,12 @@ namespace Top.Client.App
         /// <summary>How far it rises and falls while it waits, in metres.</summary>
         [SerializeField] private float _hover = 0.12f;
 
+        /// <summary>How big the model of a thing on the ground is drawn, from the converted tree.</summary>
+        [SerializeField] private float _modelScale = 1f;
+
+        /// <summary>Which way that model is turned, for one exported facing somewhere else.</summary>
+        [SerializeField] private Vector3 _modelRotation = Vector3.zero;
+
         /// <summary>How far alt and A reaches, in metres.</summary>
         [SerializeField] private float _gather = 8f;
 
@@ -81,6 +87,19 @@ namespace Top.Client.App
             if (skin != null)
             {
                 skin.material.color = new Color(0.93f, 0.78f, 0.22f);
+            }
+
+            // The bag is only what a thing looks like until the model its row names is up:
+            // ContentModel finds the map preview itself, hides the renderer this object
+            // already has and puts the real model under it, while the collider stays for the
+            // right button to find. An item whose row names no model keeps its bag.
+            if (!string.IsNullOrEmpty(model))
+            {
+                var picture = bag.AddComponent<ContentModel>();
+
+                picture.Path = model;
+                picture.Scale = _modelScale;
+                picture.Rotation = _modelRotation;
             }
 
             _lying.Add(new Lying
