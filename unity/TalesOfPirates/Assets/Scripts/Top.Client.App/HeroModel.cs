@@ -86,11 +86,21 @@ namespace Top.Client.App
         private readonly List<Animation> _animations = new List<Animation>();
         private readonly Dictionary<int, ModelInstance> _worn = new Dictionary<int, ModelInstance>();
 
+        private readonly TaskCompletionSource<bool> _ready = new TaskCompletionSource<bool>();
+
         private ModelStore _store;
         private Transform _model;
         private Rig _rigClips;
         private string _playing;
         private float _rate = 1f;
+
+        /// <summary>
+        /// Finished loading the rig and the body. Anything that wants to put a model on
+        /// the hero waits for this: a scene starts its components in an order of their
+        /// own, so an inventory can ask for a coat before there is a skeleton to wear it
+        /// on, and a model put on then would simply not be there.
+        /// </summary>
+        public Task Ready => _ready.Task;
 
         /// <summary>
         /// Whether the hero is standing inside a marked safe zone, which is what
@@ -111,6 +121,8 @@ namespace Top.Client.App
             if (preview == null || preview.Content == null)
             {
                 Log.Error("no map preview to take the content folder from");
+
+                _ready.TrySetResult(true);
 
                 return;
             }
@@ -146,6 +158,8 @@ namespace Top.Client.App
             {
                 Log.Error("could not build the hero's model", exception);
             }
+
+            _ready.TrySetResult(true);
 
             Play(_idle, 1f);
         }
@@ -265,7 +279,14 @@ namespace Top.Client.App
         {
             TakeOff(slot);
 
-            if (string.IsNullOrEmpty(path) || _store == null || _model == null || _rigClips.Clips == null)
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            await Ready;
+
+            if (_store == null || _model == null || _rigClips.Clips == null)
             {
                 return;
             }

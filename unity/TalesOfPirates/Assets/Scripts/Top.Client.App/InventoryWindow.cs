@@ -92,6 +92,13 @@ namespace Top.Client.App
         [SerializeField] private bool _open;
 
         /// <summary>
+        /// Whether what the mouse does to the bag and the body is written to the log and
+        /// every cell is numbered where it stands. It is what to read while something
+        /// about the interface is not behaving, and what to turn off when it is.
+        /// </summary>
+        [SerializeField] private bool _debug = true;
+
+        /// <summary>
         /// How big the interface is drawn. The client drew it a pixel for a pixel on
         /// the screen it was made for - eight hundred by six hundred - and so does
         /// this; the number here is what makes it readable on a screen of another
@@ -105,8 +112,12 @@ namespace Top.Client.App
         private readonly Dictionary<int, Image> _worn = new Dictionary<int, Image>();
         private readonly List<Image> _cells = new List<Image>();
 
-        /// <summary>What the bag shows, by the position in it: what is owned and not worn.</summary>
-        private readonly List<int> _bag = new List<int>();
+        /// <summary>
+        /// What stands in each cell of the bag, by the cell, zero being an empty one. A
+        /// bag is a place rather than a list: what is put in it stays where it is, and
+        /// taking one thing out does not shuffle the rest along.
+        /// </summary>
+        private readonly int[] _slots = new int[BagColumns * BagRows];
 
         private Font _font;
 
@@ -184,10 +195,7 @@ namespace Top.Client.App
 
             // The whole window takes clicks and not only the cells in it: a click
             // through its frame must not order the hero about underneath.
-            var cover = Picture(_window, "Cover", null, 0f, 0f, WindowWidth, WindowHeight);
-
-            cover.raycastTarget = true;
-            cover.enabled = true;
+            Clear(_window, "Cover", 0f, 0f, WindowWidth, WindowHeight);
 
             Picture(_window, "Background", Art("INV/invform"), 0f, 0f, WindowWidth, WindowHeight);
 
@@ -195,12 +203,8 @@ namespace Top.Client.App
 
             // The strip along the top is what the window is picked up by. The tabs
             // and the close button are drawn over it and keep their own clicks.
-            var header = Picture(_window, "Header", null, 0f, 0f, WindowWidth, HeaderHeight);
-
-            header.raycastTarget = true;
-            header.enabled = true;
-
-            header.gameObject.AddComponent<UiWindowDrag>().Window = _window;
+            Clear(_window, "Header", 0f, 0f, WindowWidth, HeaderHeight)
+                .gameObject.AddComponent<UiWindowDrag>().Window = _window;
 
             Tabs();
 
@@ -218,6 +222,8 @@ namespace Top.Client.App
             // One page at a time: the window opens on the slots of the body and the
             // bag, while the apparel page waits behind the tab that names it.
             Page(true);
+
+            Fill();
 
             Redraw();
         }
@@ -244,11 +250,13 @@ namespace Top.Client.App
         {
             var atlas = Art("INV/ivntab");
 
-            Tab(atlas, "Equip tab", TabEquipX, "Equip", true);
-            Tab(atlas, "Apparel tab", TabApparelX, "Apparel", false);
+            // The frames of the client's tab atlas carry their own writing, so none is
+            // added here: the window would show every caption twice.
+            Tab(atlas, "Equip tab", TabEquipX, true);
+            Tab(atlas, "Apparel tab", TabApparelX, false);
         }
 
-        private void Tab(Sprite atlas, string name, float x, string caption, bool equip)
+        private void Tab(Sprite atlas, string name, float x, bool equip)
         {
             // The two frames the client draws: the one that is showing is the top
             // row of the atlas, the other the row beneath it.
@@ -261,12 +269,6 @@ namespace Top.Client.App
 
             button.targetGraphic = image;
             button.onClick.AddListener(() => Page(equip));
-
-            var label = Label((RectTransform)image.transform, name + " label", caption, 0f, 4f, TabWidth, 20f);
-
-            label.color = Color.black;
-            label.fontSize = 12;
-            label.alignment = TextAnchor.UpperCenter;
         }
 
         /// <summary>Shows one of the two pages the window has, and with it the bag or what may be worn.</summary>
@@ -282,17 +284,19 @@ namespace Top.Client.App
         {
             foreach (var (name, x, y) in slots)
             {
+                // A frame of the client's around a cell that takes the mouse and draws
+                // nothing of its own.
                 Picture(page, name, Art($"eqform/{name}"), x - 2f, y - 2f, Frame, Frame);
 
-                var cell = Picture(page, name + " cell", null, x, y, Cell, Cell);
-
-                cell.raycastTarget = true;
+                var cell = Clear(page, name + " cell", x, y, Cell, Cell);
 
                 // Letting something go anywhere on the body puts it on, and the four
                 // slots the body has also show what is worn in them.
                 var drag = cell.gameObject.AddComponent<UiItemDrag>();
 
-                drag.Drop = PutUp;
+                // Letting go anywhere on the body puts a thing on: the item itself knows
+                // which slot of the body it covers.
+                drag.Drop = PutOn;
 
                 var slot = Slot(name);
 
@@ -301,12 +305,19 @@ namespace Top.Client.App
                     continue;
                 }
 
-                _worn[slot] = cell;
+                drag.Slot = slot;
+                Number(cell, $"S{slot}");
+
+                _worn[slot] = Inside(cell);
                 drag.Item = () => _inventory != null ? _inventory.Equipped(slot) : 0;
+                drag.Picture = () => _worn[slot].sprite;
+                drag.Picked = picked =>
+                    Said($"picked up {Called(picked.Item != null ? picked.Item() : 0)} from the body, " +
+                         $"slot {picked.Slot}");
 
                 // The right button on the body takes a thing off, which is the other
                 // half of putting it on with the right button in the bag.
-                drag.RightClick = PutDown;
+                drag.RightClick = ignored => PutAway(-1, drag);
             }
         }
 
@@ -336,26 +347,37 @@ namespace Top.Client.App
             behind.color = new Color(0f, 0f, 0f, 0f);
             behind.raycastTarget = true;
 
-            bag.gameObject.AddComponent<UiItemDrag>().Drop = PutDown;
+            bag.gameObject.AddComponent<UiItemDrag>().Drop = drag => PutAway(-1, drag);
 
             for (var row = 0; row < BagRows; row++)
             {
                 for (var column = 0; column < BagColumns; column++)
                 {
                     var index = (row * BagColumns) + column;
-                    var cell = Picture(bag, $"Cell {index}", null, column * BagStep, row * BagStep, Cell, Cell);
 
-                    cell.raycastTarget = true;
-                    _cells.Add(cell);
+                    // The cell takes the mouse and draws nothing: what is drawn in it is
+                    // the icon inside it, at the size of its own art.
+                    var cell = Clear(bag, $"Cell {index}", column * BagStep, row * BagStep, Cell, Cell);
+
+                    Number(cell, index.ToString());
+
+                    _cells.Add(Inside(cell));
 
                     var drag = cell.gameObject.AddComponent<UiItemDrag>();
 
-                    drag.Item = () => index < _bag.Count ? _bag[index] : 0;
+                    drag.Cell = index;
+                    drag.Item = () => _slots[index];
+                    drag.Picture = () => _cells[index].sprite;
 
                     // The left button picks a thing up and the right button puts it on,
-                    // as the client does; letting go over the bag takes it off again.
-                    drag.Drop = PutDown;
-                    drag.RightClick = PutUp;
+                    // as the client does; letting go over a cell moves it there or changes
+                    // places with what is in it.
+                    // The handler is given the thing that was picked up, which is not the
+                    // cell it is being dropped on.
+                    drag.Drop = source => PutAway(index, source);
+                    drag.RightClick = PutOn;
+                    drag.Picked = picked =>
+                        Said($"picked up {Called(picked.Item != null ? picked.Item() : 0)} from {At(picked.Cell)}");
                 }
             }
         }
@@ -395,36 +417,87 @@ namespace Top.Client.App
                 return;
             }
 
-            _bag.Clear();
-
-            foreach (var id in _inventory.Owned)
-            {
-                // What is worn is drawn in its slot of the body and not in the bag:
-                // one thing is in one place at a time, which is also what drag and
-                // drop moves it between.
-                if (_inventory.TryGet(id, out var owned) && owned.Slot > 0 && _inventory.Equipped(owned.Slot) == id)
-                {
-                    continue;
-                }
-
-                _bag.Add(id);
-            }
-
             for (var i = 0; i < _cells.Count; i++)
             {
-                _cells[i].sprite = i < _bag.Count && _inventory.TryGet(_bag[i], out var item)
-                    ? Icon(item.Icon)
-                    : null;
-
-                _cells[i].enabled = _cells[i].sprite != null;
+                Show(_cells[i], _slots[i]);
             }
 
             foreach (var entry in _worn)
             {
-                var worn = _inventory.Equipped(entry.Key);
+                Show(entry.Value, _inventory.Equipped(entry.Key));
+            }
+        }
 
-                entry.Value.sprite = worn != 0 && _inventory.TryGet(worn, out var item) ? Icon(item.Icon) : null;
-                entry.Value.enabled = entry.Value.sprite != null;
+        /// <summary>
+        /// Draws what an item looks like in a cell, at the size its art was drawn at and
+        /// centred. The client draws an icon as it is rather than stretching it to the
+        /// cell, so one that is a little wider than its cell overlaps the frame around
+        /// it the same way there.
+        /// </summary>
+        private void Show(Image icon, int id)
+        {
+            icon.sprite = id != 0 && _inventory != null && _inventory.TryGet(id, out var item)
+                ? Icon(item.Icon)
+                : null;
+
+            icon.enabled = icon.sprite != null;
+
+            if (icon.enabled)
+            {
+                icon.SetNativeSize();
+            }
+        }
+
+        /// <summary>
+        /// Puts what the hero owns into the bag, in the order it is listed, and only
+        /// once - from then on a cell holds what it holds.
+        /// </summary>
+        private void Fill()
+        {
+            if (_inventory == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < _inventory.Owned.Count && i < _slots.Length; i++)
+            {
+                _slots[i] = _inventory.Owned[i];
+            }
+
+            for (var i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i] != 0)
+                {
+                    Said($"the bag starts with {Called(_slots[i])} in {At(i)}");
+                }
+            }
+        }
+
+        /// <summary>Empties the cell an item stands in, which is what putting it on does.</summary>
+        private void Take(int id)
+        {
+            for (var i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i] == id)
+                {
+                    _slots[i] = 0;
+
+                    return;
+                }
+            }
+        }
+
+        /// <summary>Puts an item in the first empty cell, which is where taking it off leaves it.</summary>
+        private void Store(int id)
+        {
+            for (var i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i] == 0)
+                {
+                    _slots[i] = id;
+
+                    return;
+                }
             }
         }
 
@@ -432,58 +505,154 @@ namespace Top.Client.App
         /// Putting something down on the body puts it on, wherever on the body it was
         /// let go: the item knows which slot of the body it covers.
         /// </summary>
-        private void PutUp(UiItemDrag drag)
+        /// <summary>
+        /// Something was let go over the body: it is put on, and whatever that displaces
+        /// goes into the bag.
+        /// </summary>
+        private async void PutOn(UiItemDrag drag)
         {
             var id = drag.Item != null ? drag.Item() : 0;
 
-            if (id != 0)
+            Said($"put on asked for {At(drag.Cell)}, slot {drag.Slot}: id {id}");
+
+            if (id == 0 || _inventory == null || !_inventory.TryGet(id, out var item))
             {
-                Wear(id);
+                Said($"  nothing to put on: id {id} is not in the table of items");
+
+                return;
+            }
+
+            if (item.Slot <= 0)
+            {
+                Said($"  {Called(id)} covers no slot of the body");
+
+                return;
+            }
+
+            try
+            {
+                var displaced = _inventory.Equipped(item.Slot);
+
+                if (!await Equip(id))
+                {
+                    Said($"  {Called(id)} could not be put on");
+
+                    return;
+                }
+
+                // The cell it came from empties only now that the thing is really on.
+                Take(id);
+
+                if (displaced != 0 && displaced != id && !_inventory.IsOwn(displaced))
+                {
+                    Store(displaced);
+
+                    Said($"  {Called(id)} is on, and {Called(displaced)} went into the bag");
+                }
+                else
+                {
+                    Said($"  {Called(id)} is on");
+                }
+
+                Redraw();
+            }
+            catch (System.Exception exception)
+            {
+                Log.Error($"could not put item {id} on the hero", exception);
             }
         }
 
         /// <summary>
-        /// Puts an item on out of a click, which cannot wait for a model to load: what
-        /// goes wrong is written to the log rather than thrown at the pointer.
+        /// Something was let go over the bag - over a cell of it, or over the bag itself
+        /// when no cell is under the pointer. What was picked up in the bag changes
+        /// places with what is in the cell it was let go over; what came off the body
+        /// goes into that cell, or into the first free one.
         /// </summary>
-        private async void Wear(int id)
-        {
-            try
-            {
-                await Equip(id);
-            }
-            catch (System.Exception exception)
-            {
-                Log.Error($"could not put item {id} on the hero", exception);
-            }
-        }
-
-        /// <summary>Putting something down on the bag takes it off the body, if that is where it was.</summary>
-        private void PutDown(UiItemDrag drag)
+        private void PutAway(int cell, UiItemDrag drag)
         {
             var id = drag.Item != null ? drag.Item() : 0;
 
-            if (id == 0 || _inventory == null || !_inventory.TryGet(id, out var item) || item.Slot <= 0)
+            Said($"let go on {At(cell)}, carrying id {id} from {At(drag.Cell)}, slot {drag.Slot}");
+
+            if (id == 0)
             {
                 return;
             }
 
-            if (_inventory.Equipped(item.Slot) == id)
+            if (drag.Cell >= 0)
             {
-                _inventory.Unequip(item.Slot);
+                Move(drag.Cell, cell >= 0 ? cell : FirstFree());
+
+                Redraw();
+
+                return;
             }
+
+            // Out of a slot of the body: it is put into the bag before it is taken off,
+            // because taking it off is asynchronous - the character's own part has to
+            // load first - and by then the slot answers to something else.
+            if (_inventory != null && _inventory.Equipped(drag.Slot) == id && !_inventory.IsOwn(id))
+            {
+                var into = cell >= 0 && _slots[cell] == 0 ? cell : FirstFree();
+
+                if (into >= 0)
+                {
+                    _slots[into] = id;
+
+                    Said($"  {Called(id)} taken off slot {drag.Slot} into {At(into)}");
+                }
+
+                _inventory.Unequip(drag.Slot);
+            }
+            else
+            {
+                Said($"  nothing taken off slot {drag.Slot}");
+            }
+
+            Redraw();
         }
 
-        private async Task Equip(int id)
+        /// <summary>
+        /// Puts what is in one cell into another, changing places with what is there:
+        /// dragging a thing onto an occupied cell swaps the two rather than dropping one
+        /// of them.
+        /// </summary>
+        private void Move(int from, int to)
         {
-            try
+            if (from == to || from < 0 || to < 0 || from >= _slots.Length || to >= _slots.Length)
             {
-                await _inventory.Equip(id);
+                Said($"  nothing moved: {At(from)} to {At(to)}");
+
+                return;
             }
-            catch (System.Exception exception)
+
+            var held = _slots[to];
+            var moved = _slots[from];
+
+            _slots[to] = moved;
+            _slots[from] = held;
+
+            Said(held == 0
+                ? $"  {Called(moved)} moved from {At(from)} to {At(to)}"
+                : $"  {Called(moved)} and {Called(held)} changed places between {At(from)} and {At(to)}");
+        }
+
+        private int FirstFree()
+        {
+            for (var i = 0; i < _slots.Length; i++)
             {
-                Log.Error($"could not put item {id} on the hero", exception);
+                if (_slots[i] == 0)
+                {
+                    return i;
+                }
             }
+
+            return -1;
+        }
+
+        private async Task<bool> Equip(int id)
+        {
+            return _inventory != null && await _inventory.Equip(id);
         }
 
         private void Show(bool open)
@@ -561,6 +730,40 @@ namespace Top.Client.App
             return image;
         }
 
+        /// <summary>
+        /// An area that takes clicks and draws nothing: both the face of the window and
+        /// the strip it is picked up by need one, and a picture with no sprite would
+        /// draw a white rectangle instead.
+        /// </summary>
+        /// <summary>
+        /// Where an item's icon is drawn inside a cell: the cell itself is a clear
+        /// square that takes the mouse, and the icon is a child of it, centred, so it
+        /// can be drawn at the size of its own art without moving the cell.
+        /// </summary>
+        private static Image Inside(Image cell)
+        {
+            var icon = Picture((RectTransform)cell.transform, "Icon", null, 0f, 0f, Cell, Cell);
+            var rect = (RectTransform)icon.transform;
+
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+
+            return icon;
+        }
+
+        private static Image Clear(RectTransform parent, string name, float x, float y, float width, float height)
+        {
+            var image = Picture(parent, name, null, x, y, width, height);
+
+            image.color = new Color(0f, 0f, 0f, 0f);
+            image.raycastTarget = true;
+            image.enabled = true;
+
+            return image;
+        }
+
         private Text Label(RectTransform parent, string name, string caption, float x, float y, float width,
             float height)
         {
@@ -591,10 +794,54 @@ namespace Top.Client.App
                 new Vector2(0.5f, 0.5f), 1f);
         }
 
-        /// <summary>An icon of an item, out of the art the client names in its item table.</summary>
+        /// <summary>An icon of an item, out of the art the client names in its item table. It is
+        /// looked for without complaint: a client can name an icon it never shipped, and
+        /// an empty cell is a better answer to that than a warning on every redraw.
+        /// </summary>
         private static Sprite Icon(string icon)
         {
-            return string.IsNullOrEmpty(icon) ? null : Art($"icon/{icon}");
+            return string.IsNullOrEmpty(icon) ? null : Resources.Load<Sprite>($"Ui/icon/{icon}");
+        }
+
+        /// <summary>One line about what the interface has just done, when it is being watched.</summary>
+        private void Said(string what)
+        {
+            if (_debug)
+            {
+                Log.Info($"inventory: {what}");
+            }
+        }
+
+        /// <summary>Where a cell of the bag is: the number on it, and the column and row it sits in.</summary>
+        private static string At(int cell)
+        {
+            return cell < 0 ? "the bag" : $"cell {cell} ({cell % BagColumns},{cell / BagColumns})";
+        }
+
+        /// <summary>What a thing is called, for a line about it.</summary>
+        private string Called(int id)
+        {
+            return _inventory != null && _inventory.TryGet(id, out var item) && !string.IsNullOrEmpty(item.Name)
+                ? $"'{item.Name}' (id {id}, slot {item.Slot})"
+                : $"id {id}";
+        }
+
+        /// <summary>
+        /// Writes the number of a cell on it, so that a line of the log can be pointed at
+        /// something on the screen. Slots of the body are numbered by the slot they are.
+        /// </summary>
+        private void Number(Image cell, string number)
+        {
+            if (!_debug)
+            {
+                return;
+            }
+
+            var label = Label((RectTransform)cell.transform, "Number", number, 1f, 0f, Cell, 12f);
+
+            label.color = new Color(0f, 0f, 0f, 0.55f);
+            label.fontSize = 9;
+            label.alignment = TextAnchor.UpperLeft;
         }
 
         private static Sprite Art(string name)

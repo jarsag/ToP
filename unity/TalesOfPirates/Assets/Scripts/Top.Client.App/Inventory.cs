@@ -26,13 +26,6 @@ namespace Top.Client.App
         [SerializeField] private int[] _owned = { 2196, 359, 535, 711 };
 
         /// <summary>
-        /// What the hero is wearing, by item id. Empty by default: what he owns lies in
-        /// the bag until something puts it on. Where two ids name the same slot the last
-        /// one wins, and a slot no id names is left as the body has it.
-        /// </summary>
-        [SerializeField] private int[] _worn = new int[0];
-
-        /// <summary>
         /// The character's own set, by item id: what every slot falls back to when
         /// whatever was over it comes off.
         /// <br/>
@@ -98,17 +91,16 @@ namespace Top.Client.App
                 return;
             }
 
-            // The character's own set goes on first - without it there is a head and
-            // little else - and then whatever the scene asked for over it.
+            // The character's own set goes on - without it there is a head and little
+            // else - and what the hero owns stays in the bag until it is put on.
             foreach (var id in _own)
             {
                 await Equip(id);
             }
 
-            foreach (var id in _worn)
-            {
-                await Equip(id);
-            }
+            // A window built before the tables were read drew an empty bag, so it is
+            // told to look again now that there is something to draw.
+            Changed?.Invoke();
         }
 
         /// <summary>
@@ -181,6 +173,23 @@ namespace Top.Client.App
             {
                 Put(own);
             }
+        }
+
+        /// <summary>
+        /// Whether an item is one of the character's own parts. Those never leave it:
+        /// taking something off a slot only ever hands the slot back to one of these.
+        /// </summary>
+        public bool IsOwn(int id)
+        {
+            foreach (var own in _own)
+            {
+                if (own == id)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>The item the character wears of its own in a slot, or zero when it wears none there.</summary>

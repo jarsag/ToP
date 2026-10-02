@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -25,10 +26,26 @@ namespace Top.Client.App
         public Action<UiItemDrag> Drop;
 
         /// <summary>
+        /// What the item under the mouse looks like, which is the icon drawn in the cell
+        /// rather than anything the cell draws itself: the cell is a clear square that
+        /// takes the mouse, and the picture of the thing lives inside it.
+        /// </summary>
+        public Func<Sprite> Picture;
+
+        /// <summary>
         /// What a right click does, which is the client's way of putting something on
         /// or taking it off without moving the mouse.
         /// </summary>
         public Action<UiItemDrag> RightClick;
+
+        /// <summary>Which cell of the bag this is, or -1 for a slot of the body.</summary>
+        public int Cell = -1;
+
+        /// <summary>Which slot of the body this is, or zero for a cell of the bag.</summary>
+        public int Slot;
+
+        /// <summary>Told when something is picked up here, so that it can be written down.</summary>
+        public Action<UiItemDrag> Picked = null;
 
         private static RectTransform _dragged;
 
@@ -47,22 +64,25 @@ namespace Top.Client.App
                 return;
             }
 
-            var source = GetComponent<Image>();
+            var sprite = Picture != null ? Picture() : null;
+            var canvas = GetComponentInParent<Canvas>();
 
-            if (source == null || source.sprite == null || source.canvas == null)
+            if (sprite == null || canvas == null)
             {
                 return;
             }
 
             var ghost = new GameObject("Dragging", typeof(RectTransform)).AddComponent<Image>();
 
-            ghost.sprite = source.sprite;
+            ghost.sprite = sprite;
             ghost.raycastTarget = false;
 
             _dragged = ghost.rectTransform;
-            _dragged.SetParent(source.canvas.transform, false);
-            _dragged.sizeDelta = source.rectTransform.sizeDelta;
+            _dragged.SetParent(canvas.transform, false);
+            _dragged.sizeDelta = sprite.rect.size;
             _dragged.position = pointer.position;
+
+            Picked?.Invoke(this);
         }
 
         public void OnDrag(PointerEventData pointer)
@@ -79,16 +99,47 @@ namespace Top.Client.App
         {
             Forget();
 
-            var under = pointer.pointerCurrentRaycast.gameObject;
-
-            if (under == null)
-            {
-                return;
-            }
-
-            var cell = under.GetComponentInParent<UiItemDrag>();
+            var cell = Under(pointer);
 
             cell?.Drop?.Invoke(this);
+        }
+
+        /// <summary>
+        /// What the pointer was let go over, found with a ray of our own. The ray carried
+        /// by the end event is the one from when the drag began, so it names the cell the
+        /// thing came from rather than the one it was dropped on - and a thing dropped on
+        /// itself does not move.
+        /// </summary>
+        private static UiItemDrag Under(PointerEventData pointer)
+        {
+            var system = EventSystem.current;
+
+            if (system == null)
+            {
+                return null;
+            }
+
+            var where = new PointerEventData(system) { position = pointer.position };
+            var results = new List<RaycastResult>();
+
+            system.RaycastAll(where, results);
+
+            foreach (var result in results)
+            {
+                if (result.gameObject == null)
+                {
+                    continue;
+                }
+
+                var cell = result.gameObject.GetComponentInParent<UiItemDrag>();
+
+                if (cell != null)
+                {
+                    return cell;
+                }
+            }
+
+            return null;
         }
 
         private void OnDisable()

@@ -34,6 +34,12 @@ namespace Top.Client.App.Editor
         /// <summary>How long a diagonal has to be before letting go counts as drawing rather than as a corner.</summary>
         private const float Shortest = 1f;
 
+        /// <summary>
+        /// How wide a spawn point is. It is a place rather than an area - somewhere to be
+        /// put down - so it is always the same size and one click is enough to mark it.
+        /// </summary>
+        private const float SpawnSize = 2f;
+
         /// <summary>How far a click goes looking for ground. The scene view sits well above the map.</summary>
         private const float Reach = 4000f;
 
@@ -122,8 +128,11 @@ namespace Top.Client.App.Editor
             _draw = EditorGUILayout.ToggleLeft("Draw zones in the scene view", _draw);
 
             EditorGUILayout.LabelField(_draw
-                    ? "Drag a diagonal over the ground, or click one corner and then the opposite one. " +
-                      "Esc or the right button gives up the corner. Drawing hides the transform tools."
+                    ? _kind == ZoneKind.Spawn
+                        ? "Click the ground to put a spawn point down: it is always two metres across. " +
+                          "Esc or the right button gives up nothing, because nothing is being held."
+                        : "Drag a diagonal over the ground, or click one corner and then the opposite one. " +
+                          "Esc or the right button gives up the corner. Drawing hides the transform tools."
                     : "Turn drawing on, then draw a zone on the terrain. The transform tools come back " +
                       "when it is off.",
                 EditorStyles.miniLabel);
@@ -308,6 +317,23 @@ namespace Top.Client.App.Editor
             }
 
             var current = Event.current;
+
+            if (_kind == ZoneKind.Spawn)
+            {
+                // A spawn point is put down rather than drawn: one click marks the place,
+                // at the size a spawn point always is.
+                _from = null;
+                _pressing = false;
+
+                if (current.type == EventType.MouseDown && current.button == 0 && !current.alt && _pointing)
+                {
+                    PlaceAt(_pointer, new Vector2(SpawnSize, SpawnSize));
+
+                    current.Use();
+                }
+
+                return;
+            }
 
             if (current.type == EventType.KeyDown && current.keyCode == KeyCode.Escape)
             {
@@ -520,7 +546,13 @@ namespace Top.Client.App.Editor
 
         private void Place(Vector3 from, Vector3 to)
         {
-            var map = MapSpace.ToMap((from + to) * 0.5f);
+            PlaceAt((from + to) * 0.5f, new Vector2(Mathf.Abs(to.x - from.x), Mathf.Abs(to.z - from.z)));
+        }
+
+        /// <summary>Puts a zone of a size down on a place on the ground, on the map's own surface.</summary>
+        private void PlaceAt(Vector3 ground, Vector2 size)
+        {
+            var map = MapSpace.ToMap(ground);
 
             var zone = new GameObject(_kind == ZoneKind.Spawn ? "Spawn point" : "Safe zone");
 
@@ -530,7 +562,7 @@ namespace Top.Client.App.Editor
             var component = zone.AddComponent<Zone>();
 
             component.Kind = _kind;
-            component.Size = new Vector2(Mathf.Abs(to.x - from.x), Mathf.Abs(to.z - from.z));
+            component.Size = size;
 
             Undo.RegisterCreatedObjectUndo(zone, "Mark a zone");
 
