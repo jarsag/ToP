@@ -353,6 +353,11 @@ namespace Top.Client.App
                 return;
             }
 
+            // How far into the clip the parts already playing it have got. A part put on
+            // now would otherwise start its own copy from the beginning and walk a step
+            // out of time with the rest - a coat walking its own walk - so it is started
+            // where they are.
+            var at = Phase(name);
             var played = 0;
 
             foreach (var animation in _animations)
@@ -364,13 +369,23 @@ namespace Top.Client.App
                     continue;
                 }
 
-                // A part put on after the hero was already moving has the clip in hand but
-                // is not playing it - and what is put on when something is taken off is the
-                // character's own set, which is most of a body. Standing in a bind pose is
-                // standing still until something else happens to wake it up.
+                var state = animation[name];
+
                 if (_playing != name || !animation.IsPlaying(name))
                 {
                     animation.CrossFade(name, 0.15f);
+
+                    // Only a part joining a clip already under way is caught up; a clip
+                    // that everything is switching to starts at its own beginning.
+                    if (state != null && at > 0f)
+                    {
+                        state.normalizedTime = at;
+                    }
+                }
+
+                if (state != null)
+                {
+                    state.speed = rate;
                 }
 
                 played++;
@@ -382,10 +397,17 @@ namespace Top.Client.App
             }
 
             _playing = name;
+        }
 
+        /// <summary>
+        /// How far into a clip the parts already playing it have got, which is what a part
+        /// put on now has to catch up with. Zero when none of them is playing it.
+        /// </summary>
+        private float Phase(string name)
+        {
             foreach (var animation in _animations)
             {
-                if (animation == null)
+                if (animation == null || !animation.IsPlaying(name))
                 {
                     continue;
                 }
@@ -394,9 +416,11 @@ namespace Top.Client.App
 
                 if (state != null)
                 {
-                    state.speed = rate;
+                    return state.normalizedTime;
                 }
             }
+
+            return 0f;
         }
 
         private void HidePlaceholder()
