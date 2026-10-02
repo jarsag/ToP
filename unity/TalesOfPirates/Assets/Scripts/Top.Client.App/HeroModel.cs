@@ -142,7 +142,7 @@ namespace Top.Client.App
             // drawn there alone.
             var where = _hero != null ? _hero.transform.position : transform.position;
 
-            Safe = SafeZone.IsSafe(where);
+            Safe = Zone.IsSafe(where);
 
             var speed = _hero != null ? _hero.Speed : 0f;
 

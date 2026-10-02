@@ -12,6 +12,9 @@ namespace Top.Client.Game.World
         private const byte LevelMask = 0x3F;
         private const float LevelStep = 0.05f;
 
+        /// <summary>Attribute cells are half a tile across, so a map coordinate names a cell at twice its value.</summary>
+        private const float CellsPerTile = 2f;
+
         private static readonly MapPlacement[] NoPlacements = Array.Empty<MapPlacement>();
 
         private readonly MapFile _file;
@@ -65,6 +68,25 @@ namespace Top.Client.Game.World
             var height = (cell & LevelMask) * LevelStep;
 
             return (cell & SignBit) != 0 ? -height : height;
+        }
+
+        /// <summary>
+        /// The height of the surface a body stands on: the map's own relief, or
+        /// the level its cell names when that is higher.
+        /// <br/>
+        /// The client keeps that level in the same byte as the wall flag, in steps
+        /// of five centimetres, and it is what makes a staircase, a bridge or a
+        /// platform something to walk up rather than something to walk through: the
+        /// terrain is a height field and the mesh built from it knows nothing about
+        /// what stands on it. A cell with no level of its own leaves the relief
+        /// alone, which is most of a map - the level marks the ground a body uses,
+        /// and the sea around an island has none.
+        /// </summary>
+        public float SurfaceAt(float x, float y)
+        {
+            var level = CellHeightAt(Mathf.FloorToInt(x * CellsPerTile), Mathf.FloorToInt(y * CellsPerTile));
+
+            return level > 0f ? Mathf.Max(HeightAt(x, y), level) : HeightAt(x, y);
         }
 
         public Color32 ColorAt(int tileX, int tileY)

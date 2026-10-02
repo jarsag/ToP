@@ -168,6 +168,30 @@ namespace Top.Client.Game.Tests.World
         }
 
         [Test]
+        public void A_level_in_a_cell_lifts_the_surface_a_body_walks_on()
+        {
+            var map = CreateMap(2, 2, 2);
+
+            AddChunk(map, 0, 0);
+
+            // Flat ground a metre up, with three of the tile's four cells marked:
+            // a stair two metres up, a low level, and one below the ground.
+            SetTile(map, 0, 0, new MapTile { Height = 1f, Cell00 = 40, Cell10 = 10, Cell01 = 0x40 | 10 });
+            SetTile(map, 1, 0, new MapTile { Height = 1f });
+            SetTile(map, 0, 1, new MapTile { Height = 1f });
+            SetTile(map, 1, 1, new MapTile { Height = 1f });
+
+            var data = Load(map);
+
+            Assert.That(data.SurfaceAt(0.25f, 0.25f), Is.EqualTo(2f).Within(0.0001f),
+                "the surface is on top of what stands on the ground");
+            Assert.That(data.SurfaceAt(0.75f, 0.25f), Is.EqualTo(1f).Within(0.0001f),
+                "a level under the ground does not sink a body into it");
+            Assert.That(data.SurfaceAt(0.25f, 0.75f), Is.EqualTo(1f).Within(0.0001f),
+                "nor does one below the ground");
+        }
+
+        [Test]
         public void Vertex_color_reads_back_per_tile_and_open_water_is_white()
         {
             var map = CreateMap(4, 4, 2);

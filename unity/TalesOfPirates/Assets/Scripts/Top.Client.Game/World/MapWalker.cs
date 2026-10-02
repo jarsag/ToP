@@ -35,11 +35,13 @@ namespace Top.Client.Game.World
         public Vector2 Position => _position;
 
         /// <summary>
-        /// The terrain height under the walker. The terrain mesh is built from
-        /// this same field, so standing here puts a body on the surface rather
-        /// than near it.
+        /// The height of the surface under the walker: the map's relief, raised to
+        /// the level its cell names when the cell names one. The terrain mesh is
+        /// built from the relief alone, so without that level a walker goes
+        /// through a staircase and then pops up when the hill under it rises past
+        /// him - the level is what says the surface is on top of the object.
         /// </summary>
-        public float GroundHeight => _map.HeightAt(_position.x, _position.y);
+        public float GroundHeight => _map.SurfaceAt(_position.x, _position.y);
 
         /// <summary>
         /// Where the walker stands in world space, already at ground level.

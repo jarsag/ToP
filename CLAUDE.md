@@ -47,11 +47,21 @@ switched off and the preview's streaming follows the camera: a camera flown away
 otherwise stare at an empty scene, because chunks only build around the preview's focus.
 
 A click does not raycast against geometry - there is none, the ground is a height field - so `MapRay`
-walks the ray forward and compares it with `MapData.HeightAt`, which lands on ground whose chunks are
-still streaming in. The mark is a `DestinationMarker` (it turns and hovers over the point it was put
-at), drawn from a prefab when one is assigned and made on the spot otherwise: the model its marker
+walks the ray forward and compares it with `MapData.SurfaceAt`, which lands on ground whose chunks are
+still streaming in, and on the deck of a bridge rather than the water under it. `SurfaceAt` is the
+relief raised to the level its cell names: the client keeps that level in the same byte as the wall
+flag, in five centimetre steps, and it is what makes a staircase something to walk up rather than
+something to walk through. The mark is a `DestinationMarker` (it turns and hovers over the point it was
+put at), drawn from a prefab when one is assigned and made on the spot otherwise: the model its marker
 model names, which `ContentModel` loads out of the converted tree, or a flat disc when no model is
 named.
+
+`Zone`, put on the map as often as it is wanted, marks ground by kind. A safe zone is the rectangle the
+hero is out of danger on, and the clips `HeroModel` plays answer to `Zone.IsSafe`; a spawn point is the
+circle he may start from, one of which `HeroController` picks at random when the map finishes loading.
+A scene with no spawn points starts him where the scene left him, and one with no safe zones has
+nowhere that is war. `Tools -> Zones` draws them straight onto the terrain - a diagonal dragged or
+clicked corner by corner, both corners on the height field - and the runtime only reads them.
 
 `HeroModel`, added to the hero, dresses it in a converted character. A player character converts as
 parts: a rig (`rigs/<model>.glb`) that is a skeleton and its clips and draws nothing, and one file per

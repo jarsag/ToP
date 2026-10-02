@@ -1,5 +1,6 @@
 using System;
 using Top.Client.Game.World;
+using Top.Logging;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -52,6 +53,13 @@ namespace Top.Client.App
 
         /// <summary>How far a click goes looking for ground, in world units.</summary>
         [SerializeField] private float _reach = 2000f;
+
+        /// <summary>
+        /// Whether the hero starts on a spawn point marked on the map rather than
+        /// where the scene left him. A scene with no spawn points marked keeps him
+        /// where he stands either way.
+        /// </summary>
+        [SerializeField] private bool _spawnOnZone = true;
 
         private MapWalker _walker;
         private DestinationMarker _placed;
@@ -304,6 +312,17 @@ namespace Top.Client.App
             }
 
             _walker = new MapWalker(map, MapSpace.ToMap(transform.position), _bodyRadius);
+
+            // A marked spawn point is where the hero starts, and a map with none
+            // leaves him exactly where the scene put him.
+            if (_spawnOnZone && Zone.TryRandomSpawn(out var spawn))
+            {
+                var point = MapSpace.ToMap(spawn);
+
+                _walker.PlaceAt(point);
+
+                Log.Info($"the hero starts on a spawn point at map ({point.x:0.0}, {point.y:0.0})");
+            }
 
             return _walker;
         }

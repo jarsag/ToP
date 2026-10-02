@@ -89,7 +89,9 @@ namespace Top.Client.Game.World
                 return float.PositiveInfinity;
             }
 
-            return map.HeightAt(point.x, point.y);
+            // The surface rather than the relief: a click lands on the bridge a
+            // body would stand on, not on the ground under it.
+            return map.SurfaceAt(point.x, point.y);
         }
     }
 }
