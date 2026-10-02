@@ -353,30 +353,35 @@ namespace Top.Client.App
                 return;
             }
 
-            if (_playing != name)
+            var played = 0;
+
+            foreach (var animation in _animations)
             {
-                var played = 0;
-
-                foreach (var animation in _animations)
+                // A part taken off leaves its animation behind as a destroyed component,
+                // which is not a part to play anything on.
+                if (animation == null || animation.GetClip(name) == null)
                 {
-                    // A part taken off leaves its animation behind as a destroyed
-                    // component, which is not a part to play anything on.
-                    if (animation == null || animation.GetClip(name) == null)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
+                // A part put on after the hero was already moving has the clip in hand but
+                // is not playing it - and what is put on when something is taken off is the
+                // character's own set, which is most of a body. Standing in a bind pose is
+                // standing still until something else happens to wake it up.
+                if (_playing != name || !animation.IsPlaying(name))
+                {
                     animation.CrossFade(name, 0.15f);
-                    played++;
                 }
 
-                if (played == 0)
-                {
-                    Log.Warning($"no part has the clip '{name}'");
-                }
-
-                _playing = name;
+                played++;
             }
+
+            if (played == 0 && _playing != name)
+            {
+                Log.Warning($"no part has the clip '{name}'");
+            }
+
+            _playing = name;
 
             foreach (var animation in _animations)
             {

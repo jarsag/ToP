@@ -51,6 +51,16 @@ namespace Top.Client.App
         private const float HeaderHeight = 36f;
 
         /// <summary>
+        /// Where the slots of the body are nudged to. The client's script puts them where
+        /// it puts them, but its window art draws the panel they belong in a little
+        /// further in - the white of it starts at 13 by 52 - so the group is moved to sit
+        /// inside it rather than over its border.
+        /// </summary>
+        private const float SlotsX = 7f;
+
+        private const float SlotsY = 14f;
+
+        /// <summary>
         /// The slots of the body, where the client's script puts them: a cell of
         /// thirty-two pixels with a frame of thirty-six around it, two up and left.
         /// </summary>
@@ -286,9 +296,9 @@ namespace Top.Client.App
             {
                 // A frame of the client's around a cell that takes the mouse and draws
                 // nothing of its own.
-                Picture(page, name, Art($"eqform/{name}"), x - 2f, y - 2f, Frame, Frame);
+                Picture(page, name, Art($"eqform/{name}"), x - 2f + SlotsX, y - 2f + SlotsY, Frame, Frame);
 
-                var cell = Clear(page, name + " cell", x, y, Cell, Cell);
+                var cell = Clear(page, name + " cell", x + SlotsX, y + SlotsY, Cell, Cell);
 
                 // Letting something go anywhere on the body puts it on, and the four
                 // slots the body has also show what is worn in them.
