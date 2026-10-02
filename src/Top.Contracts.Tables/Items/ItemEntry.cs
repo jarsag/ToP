@@ -32,5 +32,13 @@ namespace Top.Contracts.Tables.Items
         /// part of the body rather than something over it.
         /// </summary>
         [JsonProperty("slot")] public int Slot;
+
+        /// <summary>
+        /// The model of the item lying on the ground, out of the client's own model
+        /// column - the file it draws when something has been dropped rather than worn or
+        /// held. Null when the row names none, which is a hundred or so items out of six
+        /// thousand.
+        /// </summary>
+        [JsonProperty("dropModel", DefaultValueHandling = DefaultValueHandling.Ignore)] public string DropModel;
     }
 }

@@ -14,6 +14,12 @@ namespace Top.Client.Game.Tables
 
         /// <summary>The model for the class that asked, null when the item is not made for it.</summary>
         public string Model;
+
+        /// <summary>
+        /// The model the item is on the ground, which is the same for every class. Null
+        /// when the client names none, which is a hundred items out of six thousand.
+        /// </summary>
+        public string DropModel;
     }
 
     /// <summary>
@@ -51,6 +57,7 @@ namespace Top.Client.Game.Tables
             item.Icon = entry.Icon;
             item.Slot = entry.Slot;
             item.Model = Model(entry, playerClass);
+            item.DropModel = entry.DropModel;
 
             return true;
         }

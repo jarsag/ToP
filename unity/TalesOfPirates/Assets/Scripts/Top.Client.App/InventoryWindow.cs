@@ -47,6 +47,13 @@ namespace Top.Client.App
         private const float TabEquipX = 8f;
         private const float TabApparelX = 98f;
 
+        /// <summary>
+        /// How far a thing can be thrown, in metres. The ground is a height field rather
+        /// than geometry, so the spot a throw lands on is taken on the plane the hero
+        /// stands on and kept this close to him.
+        /// </summary>
+        private const float Reach = 8f;
+
         /// <summary>How much of the top of the window is the strip it is picked up by.</summary>
         private const float HeaderHeight = 36f;
 
@@ -385,6 +392,7 @@ namespace Top.Client.App
                     // The handler is given the thing that was picked up, which is not the
                     // cell it is being dropped on.
                     drag.Drop = source => PutAway(index, source);
+                    drag.Released = Throw;
                     drag.RightClick = PutOn;
                     drag.Picked = picked =>
                         Said($"picked up {Called(picked.Item != null ? picked.Item() : 0)} from {At(picked.Cell)}");
@@ -578,6 +586,72 @@ namespace Top.Client.App
         /// places with what is in the cell it was let go over; what came off the body
         /// goes into that cell, or into the first free one.
         /// </summary>
+        /// <summary>
+        /// Something was let go of outside the window. A thing out of the bag is thrown at
+        /// the ground the pointer names, within reach of the hero, and leaves the bag; what
+        /// the row says it looks like on the ground is what the mark is drawn from.
+        /// </summary>
+        private void Throw(UiItemDrag drag)
+        {
+            var id = drag.Item != null ? drag.Item() : 0;
+
+            if (id == 0 || drag.Cell < 0 || _inventory == null || !_inventory.TryGet(id, out var item))
+            {
+                return;
+            }
+
+            var hero = FindAnyObjectByType<HeroController>();
+            var from = hero != null ? hero.transform.position : transform.position;
+
+            var camera = Camera.main;
+            var ray = camera != null ? camera.ScreenPointToRay(drag.LetGoAt) : new Ray(from, Vector3.forward);
+            var ground = new Plane(Vector3.up, from);
+
+            if (!ground.Raycast(ray, out var distance))
+            {
+                Said($"nothing dropped: the pointer is not over the world");
+
+                return;
+            }
+
+            var away = ray.GetPoint(distance) - from;
+
+            away.y = 0f;
+
+            if (away.magnitude > Reach)
+            {
+                away = away.normalized * Reach;
+            }
+
+            var spot = from + away;
+
+            var bag = FindAnyObjectByType<GroundItems>();
+
+            if (bag == null)
+            {
+                // The scene does not have to be wired up for this to work: the things the
+                // hero lets go of are kept beside him, wherever he is.
+                bag = new GameObject("Ground items").AddComponent<GroundItems>();
+
+                Said("the scene has no GroundItems, so one was made to drop it on");
+            }
+
+            // Where a thing taken back off the ground goes: into the bag it came out of, in
+            // the first cell that is free.
+            bag.Picked = picked =>
+            {
+                Store(picked);
+                Redraw();
+
+                Said($"picked item {picked} off the ground");
+            };
+
+            bag.Drop(id, item.DropModel, from, spot);
+
+            Take(id);
+            Redraw();
+        }
+
         private void PutAway(int cell, UiItemDrag drag)
         {
             var id = drag.Item != null ? drag.Item() : 0;

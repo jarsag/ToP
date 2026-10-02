@@ -1,0 +1,247 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using Top.Logging;
+
+namespace Top.Client.App
+{
+    /// <summary>
+    /// What lies on the ground: things taken out of the bag and let go of outside it. They
+    /// live in memory for one run of the game and nothing about them outlives it, and each
+    /// is thrown from the hero to the spot it was dropped on. The right button takes one
+    /// back, and alt with A gathers everything within reach of the hero.
+    /// </summary>
+    public class GroundItems : MonoBehaviour
+    {
+        /// <summary>How long a thing is in the air on its way to the ground.</summary>
+        [SerializeField] private float _flight = 0.5f;
+
+        /// <summary>How high it rises on the way, in metres.</summary>
+        [SerializeField] private float _arc = 1.5f;
+
+        /// <summary>How wide the bag a dropped item is drawn as.</summary>
+        [SerializeField] private float _size = 0.45f;
+
+        /// <summary>How far alt and A reaches, in metres.</summary>
+        [SerializeField] private float _gather = 8f;
+
+        /// <summary>How far the right button can reach a bag, in metres.</summary>
+        [SerializeField] private float _click = 40f;
+
+        [SerializeField] private bool _debug = true;
+
+        /// <summary>Where a thing picked up off the ground goes, which is the bag it came out of.</summary>
+        public Action<int> Picked;
+
+        private readonly List<Lying> _lying = new List<Lying>();
+
+        /// <summary>One thing on the ground, and the throw it is still making.</summary>
+        private class Lying
+        {
+            public GameObject Bag;
+
+            public int ItemId;
+
+            public Vector3 From;
+
+            public Vector3 To;
+
+            public float Left;
+
+            public float Flight;
+        }
+
+        /// <summary>How many things are on the ground, which is what the log reports.</summary>
+        public int Count => _lying.Count;
+
+        /// <summary>
+        /// Lets an item go at a place on the ground, thrown from where the hero stands: the
+        /// spot is settled at once and only the bag has to travel there.
+        /// </summary>
+        public void Drop(int itemId, string model, Vector3 from, Vector3 spot)
+        {
+            var bag = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+
+            bag.name = $"Ground item {itemId}";
+
+            bag.transform.SetParent(transform, worldPositionStays: true);
+            bag.transform.position = from;
+            bag.transform.localScale = new Vector3(_size, _size * 0.8f, _size);
+
+            var skin = bag.GetComponent<Renderer>();
+
+            if (skin != null)
+            {
+                skin.material.color = new Color(0.93f, 0.78f, 0.22f);
+            }
+
+            _lying.Add(new Lying
+            {
+                Bag = bag,
+                ItemId = itemId,
+                From = from,
+                To = spot,
+                Left = _flight,
+                Flight = _flight,
+            });
+
+            Said($"item {itemId} dropped, drawn from '{model}' at world " +
+                 $"({spot.x:0.0}, {spot.y:0.0}, {spot.z:0.0}); {_lying.Count} on the ground");
+        }
+
+        private void Update()
+        {
+            Fly();
+            Clicked();
+            Gathered();
+        }
+
+        /// <summary>Walks every bag still in the air along its throw.</summary>
+        private void Fly()
+        {
+            foreach (var lying in _lying)
+            {
+                if (lying.Bag == null || lying.Left <= 0f)
+                {
+                    continue;
+                }
+
+                lying.Left = Mathf.Max(0f, lying.Left - Time.deltaTime);
+
+                var done = 1f - lying.Left / lying.Flight;
+                var at = Vector3.Lerp(lying.From, lying.To, done);
+
+                at.y += _arc * Mathf.Sin(Mathf.PI * done);
+
+                lying.Bag.transform.position = lying.Left <= 0f ? lying.To : at;
+            }
+        }
+
+        /// <summary>
+        /// The right button takes one thing back, whichever one it is pointing at. The left
+        /// button belongs to the hero, who walks where it is pressed.
+        /// </summary>
+        private void Clicked()
+        {
+            var mouse = Mouse.current;
+            var camera = Camera.main;
+
+            if (mouse == null || camera == null || !mouse.rightButton.wasPressedThisFrame)
+            {
+                return;
+            }
+
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                return;
+            }
+
+            var ray = camera.ScreenPointToRay(mouse.position.ReadValue());
+
+            if (!Physics.Raycast(ray, out var hit, _click))
+            {
+                return;
+            }
+
+            var lying = Find(hit.collider != null ? hit.collider.gameObject : null);
+
+            if (lying != null)
+            {
+                Pick(lying);
+            }
+        }
+
+        /// <summary>Alt with A gathers everything lying within reach of the hero.</summary>
+        private void Gathered()
+        {
+            var keyboard = Keyboard.current;
+
+            if (keyboard == null || !keyboard.altKey.isPressed || !keyboard.aKey.wasPressedThisFrame)
+            {
+                return;
+            }
+
+            var hero = FindAnyObjectByType<HeroController>();
+            var from = hero != null ? hero.transform.position : transform.position;
+            var taken = 0;
+
+            for (var i = _lying.Count - 1; i >= 0; i--)
+            {
+                var lying = _lying[i];
+
+                // A thing still in the air has not landed yet, so it is not gathered.
+                if (lying == null || lying.Bag == null || lying.Left > 0f)
+                {
+                    continue;
+                }
+
+                var here = new Vector3(from.x, 0f, from.z);
+                var there = new Vector3(lying.To.x, 0f, lying.To.z);
+
+                if (Vector3.Distance(here, there) > _gather)
+                {
+                    continue;
+                }
+
+                Pick(lying);
+                taken++;
+            }
+
+            Said(taken == 0
+                ? $"alt and A found nothing within {_gather:0} metres"
+                : $"alt and A gathered {taken} thing(s) within {_gather:0} metres");
+        }
+
+        /// <summary>Which of the things on the ground this object is, if it is one of them.</summary>
+        private Lying Find(GameObject bag)
+        {
+            if (bag == null)
+            {
+                return null;
+            }
+
+            foreach (var lying in _lying)
+            {
+                if (lying.Bag == bag)
+                {
+                    return lying;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>Hands one thing back to the bag it came out of and takes it off the ground.</summary>
+        private void Pick(Lying lying)
+        {
+            var id = lying.ItemId;
+
+            _lying.Remove(lying);
+
+            if (lying.Bag != null)
+            {
+                Destroy(lying.Bag);
+            }
+
+            if (Picked != null)
+            {
+                Picked(id);
+            }
+            else
+            {
+                Said($"item {id} was dropped with nowhere to put it back");
+            }
+        }
+
+        /// <summary>One line about what was dropped or taken, when it is being watched.</summary>
+        private void Said(string what)
+        {
+            if (_debug)
+            {
+                Log.Info($"ground: {what}");
+            }
+        }
+    }
+}

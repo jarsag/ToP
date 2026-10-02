@@ -14,6 +14,17 @@ namespace Top.Conversion.Pipeline.Tables
     /// </summary>
     public class ItemTableUnit(ClientTables tables) : ITableUnit
     {
+        /// <summary>
+        /// The model of the item lying on the ground. The client keeps it in the same
+        /// column that names an item nobody wears or holds, so it is there for every
+        /// item: a dropped sword is drawn as the sword, not as a sword being carried.
+        /// </summary>
+        private static string DropModel(ItemInfoRecord row)
+        {
+            return ItemModules.TryGetOwnModel(row, out var model)
+                ? OutputPaths.ModelContentPath(ContentKind.Item, model)
+                : null;
+        }
         /// <summary>How many player classes iteminfo names a model for.</summary>
         private const int Classes = 4;
 
@@ -54,6 +65,7 @@ namespace Top.Conversion.Pipeline.Tables
                 Name = string.IsNullOrEmpty(row.Name) ? null : row.Name,
                 Type = (int)row.Type,
                 Icon = string.IsNullOrEmpty(row.Icon) || row.Icon == "0" ? null : row.Icon,
+                DropModel = DropModel(row),
                 Models = models.Any(path => path != null) ? models : null,
                 Slot = slot,
             };

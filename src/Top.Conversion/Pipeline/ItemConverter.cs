@@ -33,7 +33,14 @@ namespace Top.Conversion.Pipeline
 
         public IReadOnlyList<ModelArtifact> ModuleArtifacts { get; }
 
-        public override IEnumerable<ModelArtifact> Artifacts => ModuleArtifacts.Where(artifact => artifact != null);
+        /// <summary>
+        /// The model the item is on the ground, which iteminfo keeps in the same column it
+        /// gives an item nobody wears. Null when the client names none.
+        /// </summary>
+        public ModelArtifact GroundArtifact { get; set; }
+
+        public override IEnumerable<ModelArtifact> Artifacts =>
+            ModuleArtifacts.Append(GroundArtifact).Where(artifact => artifact != null);
     }
 
     /// <summary>
@@ -135,7 +142,17 @@ namespace Top.Conversion.Pipeline
                 artifacts[i] = ConvertModule(item, wearable, modules[i]);
             }
 
-            return new ItemResult(item.Id, item.Name, Outcome(artifacts), wearable, modules, artifacts);
+            var result = new ItemResult(item.Id, item.Name, Outcome(artifacts), wearable, modules, artifacts);
+
+            // What the item looks like lying on the ground: the client keeps that model in
+            // the column it gives an item nobody wears, so it is the item's own and it is
+            // converted as well as the parts a body wears.
+            if (ItemModules.TryGetOwnModel(item, out var ground))
+            {
+                result.GroundArtifact = ConvertModule(item, false, ground);
+            }
+
+            return result;
         }
 
         private static string ModuleFor(IReadOnlyList<string> modules, int model)

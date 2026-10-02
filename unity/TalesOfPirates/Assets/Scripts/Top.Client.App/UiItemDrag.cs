@@ -47,7 +47,61 @@ namespace Top.Client.App
         /// <summary>Told when something is picked up here, so that it can be written down.</summary>
         public Action<UiItemDrag> Picked = null;
 
+        /// <summary>
+        /// Told when something was let go of where nothing could take it, which is how the
+        /// window hears that a thing was thrown away rather than put down.
+        /// </summary>
+        public Action<UiItemDrag> Released = null;
+
+        /// <summary>
+        /// Where the pointer was when the thing was let go of, in the screen coordinates the
+        /// camera takes - the event carries it, and reading the mouse directly would ask the
+        /// wrong input system for it.
+        /// </summary>
+        public Vector2 LetGoAt;
+
+        /// <summary>
+        /// Whether something is being carried about. A click let go of outside the window is
+        /// a throw rather than a walk, so the rest of the game has to leave the mouse alone.
+        /// </summary>
+        public static bool Carrying { get; private set; }
+
+        /// <summary>Whether the button has just come up, so that the flag can outlive the frame.</summary>
+        private static bool _released;
+
         private static RectTransform _dragged;
+
+        public void OnPointerDown(PointerEventData pointer)
+        {
+            if (pointer.button != PointerEventData.InputButton.Left || Item == null || Item() == 0)
+            {
+                return;
+            }
+
+            // The mouse belongs to the game the moment a thing is pressed on, not when the
+            // drag starts: the game reads the mouse itself, so a press it acted on would
+            // walk the hero away with the thing still in hand.
+            Carrying = true;
+        }
+
+        public void OnPointerUp(PointerEventData pointer)
+        {
+            if (pointer.button == PointerEventData.InputButton.Left)
+            {
+                _released = true;
+            }
+        }
+
+        private void LateUpdate()
+        {
+            // A frame late on purpose: the game reads the same release in its own Update and
+            // has to still see that something was in hand.
+            if (_released)
+            {
+                _released = false;
+                Carrying = false;
+            }
+        }
 
         public void OnPointerClick(PointerEventData pointer)
         {
@@ -82,6 +136,8 @@ namespace Top.Client.App
             _dragged.sizeDelta = sprite.rect.size;
             _dragged.position = pointer.position;
 
+            Carrying = true;
+
             Picked?.Invoke(this);
         }
 
@@ -97,11 +153,21 @@ namespace Top.Client.App
 
         public void OnEndDrag(PointerEventData pointer)
         {
+            LetGoAt = pointer.position;
+            _released = true;
+
             Forget();
 
             var cell = Under(pointer);
 
-            cell?.Drop?.Invoke(this);
+            if (cell == null)
+            {
+                Released?.Invoke(this);
+
+                return;
+            }
+
+            cell.Drop?.Invoke(this);
         }
 
         /// <summary>
@@ -144,7 +210,11 @@ namespace Top.Client.App
 
         private void OnDisable()
         {
-            Forget();
+            
+            // The game has to stop thinking the mouse is carrying something if it was taken
+            // out of the window mid-drag.
+            Carrying = false;
+Forget();
         }
 
         private static void Forget()
