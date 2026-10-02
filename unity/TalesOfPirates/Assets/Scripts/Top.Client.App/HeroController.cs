@@ -31,6 +31,21 @@ namespace Top.Client.App
 
         private MapWalker _walker;
 
+        /// <summary>
+        /// How fast the hero is moving across the map, in map units a second.
+        /// Whatever animates the hero reads this rather than measuring the
+        /// transform itself: standing still is zero, and a wall that stopped the
+        /// step is zero too, so a body leaves off running when it stops.
+        /// </summary>
+        public float Speed { get; private set; }
+
+        /// <summary>
+        /// How far the hero's own body is lifted off the ground. A model
+        /// standing on its own feet is brought back down by this much, or it
+        /// would float.
+        /// </summary>
+        public float GroundOffset => _groundOffset;
+
         private void Update()
         {
             var walker = Walker();
@@ -43,9 +58,11 @@ namespace Top.Client.App
             var camera = Camera.main;
             var move = camera == null ? Vector2.zero : ReadMove(camera.transform);
 
-            if (move != Vector2.zero)
+            Speed = 0f;
+
+            if (move != Vector2.zero && walker.Step(move * (_speed * Time.deltaTime)))
             {
-                walker.Step(move * (_speed * Time.deltaTime));
+                Speed = _speed;
             }
 
             // The map owns the height, so the hero is placed at ground level

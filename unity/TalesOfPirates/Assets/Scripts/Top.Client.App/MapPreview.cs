@@ -34,6 +34,21 @@ namespace Top.Client.App
         private GameWorld _world;
         private CancellationTokenSource _cancellationTokenSource;
 
+        private string _contentPath;
+
+        /// <summary>
+        /// The converted tree this preview reads. Anything else that loads out of
+        /// the same tree - a character's rig and its meshes are models too - reads
+        /// it from here rather than building a second one.
+        /// </summary>
+        public IContentSource Content { get; private set; }
+
+        /// <summary>
+        /// The shader models are built with, so a model somebody else loads looks
+        /// like the ones this preview builds.
+        /// </summary>
+        public Shader ModelShader => _shaders != null ? _shaders.Model : null;
+
         /// <summary>
         /// The loaded map's terrain and attribute data, null until the preview
         /// has finished loading. Anything that walks on the map waits for this.
@@ -65,6 +80,9 @@ namespace Top.Client.App
 
         private void OnEnable()
         {
+            _contentPath = ContentRoot.Resolve(_contentRoot);
+            Content = new FolderContentSource(_contentPath);
+
             Load();
         }
 

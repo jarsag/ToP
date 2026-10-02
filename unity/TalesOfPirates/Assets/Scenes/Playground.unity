@@ -260,6 +260,7 @@ GameObject:
   - component: {fileID: 752627234}
   - component: {fileID: 752627235}
   - component: {fileID: 752627236}
+  - component: {fileID: 752627237}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -421,6 +422,25 @@ MonoBehaviour:
   _offset: {x: 0, y: 16, z: -20}
   _smoothing: 10
   _orbitSpeed: 0.25
+--- !u!114 &752627237
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 752627230}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e9c2b7a1f3d4a5b8c6e0d9f2a7b4c13, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Top.Client.App::Top.Client.App.CameraMode
+  _follow: {fileID: 0}
+  _fly: {fileID: 0}
+  _hero: {fileID: 0}
+  _preview: {fileID: 0}
+  _toggle: 3
+  _free: 0
+  _hint: 1
 --- !u!1 &766872935
 GameObject:
   m_ObjectHideFlags: 0
@@ -481,7 +501,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 935a31bbd74f68f4bb2fa692994694af, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Top.Client.App::Top.Client.App.MapPreview
-  _mapId: 1
+  _mapId: 5
   _focus: {fileID: 1959073039}
   _followSceneView: 0
   _sun: {fileID: 81175268}
@@ -588,7 +608,7 @@ Transform:
   m_GameObject: {fileID: 1959073035}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2222.23, y: 3.08, z: 2787.47}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

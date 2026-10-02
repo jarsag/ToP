@@ -42,6 +42,13 @@ button looks, the wheel changes speed, shift sprints. While flying it disables t
 the hero's own controls, and points the preview's streaming at the camera - a camera flown away from
 the hero would otherwise stare at an empty scene, because chunks only build around the preview's focus.
 
+`HeroModel`, added to the hero, dresses it in a converted character. A player character converts as
+parts: a rig (`rigs/<model>.glb`) that is a skeleton and its clips and draws nothing, and one file per
+body part and piece of equipment (`models/character/<fileId>.glb`), each carrying its own copy of the
+same skeleton and no clips of its own. The two copies have identical bones in an identical rest pose,
+so each part is handed the rig's clips and animates itself - no rebinding - and `HeroController.Speed`
+paces the move clip. Clip names are `{model}_{nn}_{action}`, from `Naming.ActionClip`.
+
 ## Lessons learned
 
 - The map is world space. Terrain vertices, placements, the hero and the camera are all world
