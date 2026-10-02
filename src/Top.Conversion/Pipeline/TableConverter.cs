@@ -27,7 +27,8 @@ namespace Top.Conversion.Pipeline
         [
             new SceneObjectTableUnit(tables),
             new TerrainTableUnit(tables),
-            new MapTableUnit(tables)
+            new MapTableUnit(tables),
+            new ItemTableUnit(tables)
         ];
 
         /// <summary>

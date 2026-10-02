@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Top.Content;
 using Top.Contracts.Tables;
+using Top.Contracts.Tables.Items;
 using Top.Contracts.Tables.World;
 
 namespace Top.Client.Game.Tables
@@ -30,10 +32,33 @@ namespace Top.Client.Game.Tables
 
             var maps = await ReadTable<MapEntry>(MapTable.Path);
 
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Items are newer than the rest of a tree: one converted before they
+            // were written still loads, it just cannot name what anybody is wearing.
+            var items = await TryReadTable<ItemEntry>(ItemTable.Path);
+
             return new TableSet(
                 new SceneObjectTable(sceneObjects),
                 new TerrainTable(terrains),
-                new MapTable(maps));
+                new MapTable(maps),
+                items == null ? null : new ItemTable(items));
+        }
+
+        private async Task<List<TEntry>> TryReadTable<TEntry>(string path) where TEntry : TableEntry
+        {
+            try
+            {
+                return await ReadTable<TEntry>(path);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         private async Task<List<TEntry>> ReadTable<TEntry>(string path) where TEntry : TableEntry

@@ -28,15 +28,27 @@ namespace Top.Client.App
         /// <summary>The character's skeleton and its clips; it draws nothing.</summary>
         [SerializeField] private string _rig = "rigs/0003.glb";
 
-        /// <summary>The body and whatever is worn, each a model of its own.</summary>
-        [SerializeField] private string[] _parts =
+        /// <summary>
+        /// The body, which every character has whatever else is on. What is worn over
+        /// it comes from the inventory: the body carries the face, so a hat has
+        /// something to sit on.
+        /// <br/>
+        /// It is called the body rather than the parts because a scene saved while
+        /// this was a list of the character's whole starting outfit would otherwise
+        /// keep that outfit on underneath whatever the inventory puts over it, and
+        /// two skins in the same place fight over the same pixels.
+        /// </summary>
+        [SerializeField] private string[] _body =
         {
-            "models/character/0003000000.glb",
-            "models/character/0003610001.glb",
-            "models/character/0003610002.glb",
-            "models/character/0003610003.glb",
-            "models/character/0003610004.glb"
+            "models/character/0003000000.glb"
         };
+
+        /// <summary>
+        /// Which of the four player classes the character is, which is the model
+        /// iteminfo names per class. The class whose modules start with 0003 - the
+        /// rig's own number - is the fourth.
+        /// </summary>
+        [SerializeField] private int _class = 3;
 
         /// <summary>
         /// Clips as the converter names them: model, action number, action. These
@@ -72,15 +84,22 @@ namespace Top.Client.App
 
         private readonly List<ModelInstance> _instances = new List<ModelInstance>();
         private readonly List<Animation> _animations = new List<Animation>();
+        private readonly Dictionary<int, ModelInstance> _worn = new Dictionary<int, ModelInstance>();
 
         private ModelStore _store;
+        private Transform _model;
+        private Rig _rigClips;
         private string _playing;
+        private float _rate = 1f;
 
         /// <summary>
         /// Whether the hero is standing inside a marked safe zone, which is what
         /// picks between the at-ease clips and the ones for danger.
         /// </summary>
         public bool Safe { get; private set; }
+
+        /// <summary>Which of the four classes the character is, for reading an item's model by class.</summary>
+        public int Class => _class;
 
         private async void Start()
         {
@@ -112,14 +131,15 @@ namespace Top.Client.App
             }
 
             _store = new ModelStore(preview.Content, preview.ModelShader);
+            _model = model.transform;
 
             try
             {
-                var rig = await Clips(model.transform);
+                _rigClips = await Clips(model.transform);
 
-                foreach (var part in _parts)
+                foreach (var part in _body)
                 {
-                    await LoadPart(part, model.transform, rig);
+                    await Add(part);
                 }
             }
             catch (Exception exception)
@@ -166,6 +186,7 @@ namespace Top.Client.App
 
             _instances.Clear();
             _animations.Clear();
+            _worn.Clear();
         }
 
         /// <summary>
@@ -207,23 +228,70 @@ namespace Top.Client.App
             return new Rig { HostName = source.gameObject.name, Clips = clips };
         }
 
-        private async Task LoadPart(string path, Transform parent, Rig rig)
+        /// <summary>
+        /// Puts a model on the hero - the body, or whatever the inventory wears -
+        /// and hands it the rig's clips, so that it animates itself.
+        /// </summary>
+        private async Task<ModelInstance> Add(string path)
         {
-            var instance = await _store.Instantiate(path, parent);
+            var instance = await _store.Instantiate(path, _model);
 
-            _instances.Add(instance);
-
-            var host = Host(instance.Root, rig.HostName);
+            var host = Host(instance.Root, _rigClips.HostName);
             var animation = host.gameObject.AddComponent<Animation>();
 
             animation.playAutomatically = false;
 
-            foreach (var clip in rig.Clips)
+            foreach (var clip in _rigClips.Clips)
             {
                 animation.AddClip(clip, clip.name);
             }
 
+            _instances.Add(instance);
             _animations.Add(animation);
+
+            // Something put on while the hero is already moving joins what he is
+            // doing rather than standing in its rest pose.
+            Play(_playing, _rate);
+
+            return instance;
+        }
+
+        /// <summary>
+        /// Wears a model in place of whatever that slot of the body had on, or takes
+        /// the slot's own off when the path is empty: a coat over a back, a hat on a
+        /// head, and one of each at a time.
+        /// </summary>
+        public async Task Wear(int slot, string path)
+        {
+            TakeOff(slot);
+
+            if (string.IsNullOrEmpty(path) || _store == null || _model == null || _rigClips.Clips == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _worn[slot] = await Add(path);
+            }
+            catch (Exception exception)
+            {
+                Log.Error($"could not wear '{path}'", exception);
+            }
+        }
+
+        /// <summary>Takes off whatever covers a slot, leaving the body as it is.</summary>
+        public void TakeOff(int slot)
+        {
+            if (!_worn.TryGetValue(slot, out var instance))
+            {
+                return;
+            }
+
+            _worn.Remove(slot);
+            _instances.Remove(instance);
+
+            instance.Dispose();
         }
 
         /// <summary>
@@ -257,6 +325,8 @@ namespace Top.Client.App
         /// </summary>
         private void Play(string name, float rate)
         {
+            _rate = rate;
+
             if (_animations.Count == 0 || string.IsNullOrEmpty(name))
             {
                 return;
@@ -268,7 +338,9 @@ namespace Top.Client.App
 
                 foreach (var animation in _animations)
                 {
-                    if (animation.GetClip(name) == null)
+                    // A part taken off leaves its animation behind as a destroyed
+                    // component, which is not a part to play anything on.
+                    if (animation == null || animation.GetClip(name) == null)
                     {
                         continue;
                     }
@@ -281,16 +353,17 @@ namespace Top.Client.App
                 {
                     Log.Warning($"no part has the clip '{name}'");
                 }
-                else if (played < _animations.Count)
-                {
-                    Log.Warning($"the clip '{name}' is missing from {_animations.Count - played} parts");
-                }
 
                 _playing = name;
             }
 
             foreach (var animation in _animations)
             {
+                if (animation == null)
+                {
+                    continue;
+                }
+
                 var state = animation[name];
 
                 if (state != null)

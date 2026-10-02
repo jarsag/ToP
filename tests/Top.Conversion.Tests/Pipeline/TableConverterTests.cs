@@ -53,13 +53,27 @@ namespace Top.Conversion.Tests.Pipeline
 
         private TableConverter Converter(bool overwrite = true, params SceneObjectInfoRecord[] rows)
         {
-            var tables = new ClientTables(null, null,
+            var tables = new ClientTables(null,
+                new Top.Legacy.Tables.Table<ItemInfoRecord>([..ItemRows]),
                 new Top.Legacy.Tables.Table<SceneObjectInfoRecord>([..rows]), null,
                 new Top.Legacy.Tables.Table<TerrainInfoRecord>([..TerrainRows]),
                 new Top.Legacy.Tables.Table<MapInfoRecord>([..MapRows]));
 
             return new TableConverter(_client.Settings(overwrite), tables);
         }
+
+        /// <summary>
+        /// An item, because a table unit is converted for every table the run emits -
+        /// and a batch missing one of its sources fails rather than skips.
+        /// </summary>
+        private static readonly ItemInfoRecord[] ItemRows =
+        [
+            new ItemInfoRecord
+            {
+                Id = 1, Name = "Short Sword", Type = ItemType.Sword, Icon = "w0001",
+                Modules = ["0", "10100001", "0", "0", "0"],
+            },
+        ];
 
         private static TableResult Run(TableConverter converter, string unit = "sceneobjects")
         {
@@ -258,7 +272,7 @@ namespace Top.Conversion.Tests.Pipeline
             var results = Converter(rows: Row(42, "Stone01.lgo")).ConvertAll().ToList();
 
             Assert.That(results.Select(result => result.Name),
-                Is.EqualTo(new[] { "sceneobjects", "terrains", "maps" }));
+                Is.EqualTo(new[] { "sceneobjects", "terrains", "maps", "items" }));
             Assert.That(results.Select(result => result.Outcome),
                 Is.All.EqualTo(ConversionOutcome.Converted));
             Assert.That(results[0].Artifacts, Is.Empty);

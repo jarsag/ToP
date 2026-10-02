@@ -25,3 +25,7 @@ docs/superpowers/
 # name collides with a build-output rule above (e.g. tests/fixtures/obj).
 !tests/fixtures/obj/
 !tests/fixtures/obj/**
+
+# The client's interface art, brought in by Tools -> Import UI art and rebuilt by it.
+unity/TalesOfPirates/Assets/Resources/Ui/
+unity/TalesOfPirates/Assets/Resources/Ui.meta

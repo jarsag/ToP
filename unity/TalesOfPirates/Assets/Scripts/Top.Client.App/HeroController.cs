@@ -2,6 +2,7 @@ using System;
 using Top.Client.Game.World;
 using Top.Logging;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace Top.Client.App
@@ -123,6 +124,14 @@ namespace Top.Client.App
             var released = mouse.leftButton.wasReleasedThisFrame;
 
             if (!mouse.leftButton.isPressed && !released)
+            {
+                return;
+            }
+
+            // A click belongs to the hero only when it is not on the interface: the
+            // inventory is drawn over the map, and pointing at a slot is not pointing
+            // at the ground under it.
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             {
                 return;
             }

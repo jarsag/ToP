@@ -41,7 +41,7 @@ namespace Top.Conversion.Tests.Pipeline
             Assert.That(catalog.Section(ContentKind.Item).Entries, Has.Count.EqualTo(1));
             Assert.That(catalog.Section(ContentKind.Scene).Entries, Has.Count.EqualTo(1));
             Assert.That(catalog.Section(ContentKind.Map).Entries, Has.Count.EqualTo(1));
-            Assert.That(catalog.Section(ContentKind.Table).Entries, Has.Count.EqualTo(3));
+            Assert.That(catalog.Section(ContentKind.Table).Entries, Has.Count.EqualTo(4));
         }
 
         [Test]
@@ -255,7 +255,7 @@ namespace Top.Conversion.Tests.Pipeline
             var entries = Catalog().Section(ContentKind.Table).Entries;
 
             Assert.That(entries.Select(entry => entry.Name),
-                Is.EqualTo(new[] { "sceneobjects", "terrains", "maps" }));
+                Is.EqualTo(new[] { "sceneobjects", "terrains", "maps", "items" }));
             Assert.That(entries.All(entry => entry.Id == 0 && entry.Detail.Length > 0), Is.True);
         }
 

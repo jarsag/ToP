@@ -70,6 +70,19 @@ same skeleton and no clips of its own. The two copies have identical bones in an
 so each part is handed the rig's clips and animates itself - no rebinding - and `HeroController.Speed`
 paces the move clip. Clip names are `{model}_{nn}_{action}`, from `Naming.ActionClip`.
 
+A character is not one model, which is why the inventory has a notion of what it wears of its own: the
+body converted with a character is its head, and its arms, legs and feet are the parts of its suit, so
+an empty slot is a hole rather than bare skin. `Inventory` puts the character's own set on first and
+falls back to it when anything over a slot comes off, and never takes it off.
+
+The inventory itself is the client's. `Tools -> Import UI art` copies its window art and item icons into
+`Assets/Resources/Ui`, which is ignored by git and rebuilt by that tool. `tables/items.json` comes from
+the converter and says what each item is: the model per player class, and the slot of the body it
+covers. `InventoryWindow` - opened with **I**, or alt and E as the client did - draws the client's window
+from the numbers in its own form script, as one table of layout constants rather than a prefab: the
+window is as big as its background art, the bag's grid is where that art has it, and the atlas pieces
+are cut by the pixel rectangles the script names.
+
 ## Lessons learned
 
 - The map is world space. Terrain vertices, placements, the hero and the camera are all world
