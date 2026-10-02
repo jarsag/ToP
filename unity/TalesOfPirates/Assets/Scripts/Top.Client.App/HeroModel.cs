@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Top.Client.Game.World;
 using Top.Client.Models;
 using Top.Logging;
 using UnityEngine;
@@ -37,9 +38,20 @@ namespace Top.Client.App
             "models/character/0003610004.glb"
         };
 
-        /// <summary>Clips as the converter names them: model, action number, action.</summary>
+        /// <summary>
+        /// Clips as the converter names them: model, action number, action. These
+        /// are the ones played where the hero is safe.
+        /// </summary>
         [SerializeField] private string _idle = "0003_01_waiting";
         [SerializeField] private string _move = "0003_05_run";
+
+        /// <summary>
+        /// What is played outside the marked safe zones, where the hero is in
+        /// danger: the same body standing and running ready for a fight rather
+        /// than at ease.
+        /// </summary>
+        [SerializeField] private string _warIdle = "0003_04_waiting2";
+        [SerializeField] private string _warMove = "0003_06_run2";
 
         /// <summary>
         /// How fast the hero moves while the move clip plays at its own speed.
@@ -63,6 +75,12 @@ namespace Top.Client.App
 
         private ModelStore _store;
         private string _playing;
+
+        /// <summary>
+        /// Whether the hero is standing inside a marked safe zone, which is what
+        /// picks between the at-ease clips and the ones for danger.
+        /// </summary>
+        public bool Safe { get; private set; }
 
         private async void Start()
         {
@@ -119,15 +137,23 @@ namespace Top.Client.App
                 return;
             }
 
+            // Which side of the line the hero stands on is told by his body rather
+            // than by anything in the world: the zones are marked in the editor and
+            // drawn there alone.
+            var where = _hero != null ? _hero.transform.position : transform.position;
+
+            Safe = SafeZone.IsSafe(where);
+
             var speed = _hero != null ? _hero.Speed : 0f;
 
             if (speed <= 0.01f)
             {
-                Play(_idle, 1f);
+                Play(Safe ? _idle : _warIdle, 1f);
             }
             else
             {
-                Play(_move, Mathf.Clamp(speed / Mathf.Max(0.01f, _moveSpeed), _minRate, _maxRate));
+                Play(Safe ? _move : _warMove,
+                    Mathf.Clamp(speed / Mathf.Max(0.01f, _moveSpeed), _minRate, _maxRate));
             }
         }
 
