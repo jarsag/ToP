@@ -264,6 +264,11 @@ namespace Top.Client.App.Editor
             {
                 UnityEditor.Tools.hidden = false;
 
+                if (Event.current.type == EventType.MouseDown)
+                {
+                    Debug.LogWarning($"zones: the map has not been read, so a click has no ground to land on ({_status})");
+                }
+
                 return;
             }
 
@@ -318,6 +323,20 @@ namespace Top.Client.App.Editor
 
             var current = Event.current;
 
+            // The pointer is put on the ground before any shape is looked at: a spawn
+            // point is put down where the click lands, and the click is the event that has
+            // to have found the ground already.
+            var moving = current.type == EventType.MouseDown || current.type == EventType.MouseUp ||
+                         current.type == EventType.MouseDrag || current.type == EventType.MouseMove;
+
+            if (moving)
+            {
+                _pointing = MapRay.TryHit(_data, HandleUtility.GUIPointToWorldRay(current.mousePosition), Reach,
+                    out _pointer);
+
+                SceneView.RepaintAll();
+            }
+
             if (_kind == ZoneKind.Spawn)
             {
                 // A spawn point is put down rather than drawn: one click marks the place,
@@ -325,8 +344,15 @@ namespace Top.Client.App.Editor
                 _from = null;
                 _pressing = false;
 
-                if (current.type == EventType.MouseDown && current.button == 0 && !current.alt && _pointing)
+                if (current.type == EventType.MouseDown && current.button == 0 && !current.alt)
                 {
+                    if (!_pointing)
+                    {
+                        Debug.Log("zones: there is no ground under that click");
+
+                        return;
+                    }
+
                     PlaceAt(_pointer, new Vector2(SpawnSize, SpawnSize));
 
                     current.Use();
@@ -355,17 +381,6 @@ namespace Top.Client.App.Editor
                 return;
             }
 
-            var moving = current.type == EventType.MouseDown || current.type == EventType.MouseUp ||
-                         current.type == EventType.MouseDrag || current.type == EventType.MouseMove;
-
-            if (moving)
-            {
-                _pointing = MapRay.TryHit(_data, HandleUtility.GUIPointToWorldRay(current.mousePosition), Reach,
-                    out _pointer);
-
-                SceneView.RepaintAll();
-            }
-
             if (!_pointing)
             {
                 return;
@@ -373,10 +388,24 @@ namespace Top.Client.App.Editor
 
             if (current.type == EventType.MouseDown && current.button == 0 && !current.alt)
             {
+                if (!_pointing)
+                {
+                    Debug.Log("zones: there is no ground under that click");
+
+                    current.Use();
+
+                    return;
+                }
+
+                var first = _from == null;
+
                 // The first corner of a new zone; a corner already standing is
                 // closed by this press instead.
                 _from = _from ?? _pointer;
                 _pressing = true;
+
+                Debug.Log($"zones: corner at map ({MapSpace.ToMap(_pointer).x:0}, {MapSpace.ToMap(_pointer).y:0})" +
+                          (first ? " (the first one, waiting for the opposite)" : " (closing the zone)"));
 
                 current.Use();
 
@@ -565,6 +594,9 @@ namespace Top.Client.App.Editor
             component.Size = size;
 
             Undo.RegisterCreatedObjectUndo(zone, "Mark a zone");
+
+            Debug.Log($"zones: put a {(_kind == ZoneKind.Spawn ? "spawn point" : "safe zone")} at map " +
+                      $"({map.x:0}, {map.y:0}), {size.x:0}x{size.y:0} m");
 
             EditorSceneManager.MarkSceneDirty(zone.scene);
 
