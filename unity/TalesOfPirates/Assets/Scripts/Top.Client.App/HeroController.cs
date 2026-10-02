@@ -131,7 +131,7 @@ namespace Top.Client.App
             // A click belongs to the hero only when it is not on the interface: the
             // inventory is drawn over the map, and pointing at a slot is not pointing
             // at the ground under it.
-            if (EventSystem.current != null && (EventSystem.current.IsPointerOverGameObject() || UiItemDrag.Carrying))
+            if (EventSystem.current != null && (EventSystem.current.IsPointerOverGameObject() || UiItemDrag.Carrying || GroundItems.UnderPointer))
             {
                 return;
             }

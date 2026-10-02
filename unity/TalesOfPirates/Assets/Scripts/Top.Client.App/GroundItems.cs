@@ -47,6 +47,14 @@ namespace Top.Client.App
         /// <summary>Where a thing picked up off the ground goes, which is the bag it came out of.</summary>
         public Action<int> Picked;
 
+        /// <summary>
+        /// Whether the pointer is over something lying on the ground. It is what the hero
+        /// has to know before he walks: a click that lands on a thing picks it up instead.
+        /// The cursor answers to the same thing, which is how the client showed which of
+        /// the two a click was about to do.
+        /// </summary>
+        public static bool UnderPointer { get; private set; }
+
         private readonly List<Lying> _lying = new List<Lying>();
 
         /// <summary>One thing on the ground, and the throw it is still making.</summary>
@@ -120,8 +128,36 @@ namespace Top.Client.App
         {
             Fly();
             Spin();
-            Clicked();
+
+            var aimed = Aimed();
+
+            UnderPointer = aimed != null;
+
+            Clicked(aimed);
             Gathered();
+        }
+
+        /// <summary>The thing on the ground the pointer is over, or null when it is over none.</summary>
+        private Lying Aimed()
+        {
+            var mouse = Mouse.current;
+            var camera = Camera.main;
+
+            if (mouse == null || camera == null)
+            {
+                return null;
+            }
+
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                return null;
+            }
+
+            var ray = camera.ScreenPointToRay(mouse.position.ReadValue());
+
+            return Physics.Raycast(ray, out var hit, _click)
+                ? Find(hit.collider != null ? hit.collider.gameObject : null)
+                : null;
         }
 
         /// <summary>Walks every bag still in the air along its throw.</summary>
@@ -172,33 +208,20 @@ namespace Top.Client.App
         /// The right button takes one thing back, whichever one it is pointing at. The left
         /// button belongs to the hero, who walks where it is pressed.
         /// </summary>
-        private void Clicked()
+        private void Clicked(Lying aimed)
         {
             var mouse = Mouse.current;
-            var camera = Camera.main;
 
-            if (mouse == null || camera == null || !mouse.rightButton.wasPressedThisFrame)
+            if (mouse == null || aimed == null)
             {
                 return;
             }
 
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            // The left button takes what it is aimed at, and the right button takes one back
+            // whichever one it is pointing at: both are the client's own ways of gathering.
+            if (mouse.leftButton.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame)
             {
-                return;
-            }
-
-            var ray = camera.ScreenPointToRay(mouse.position.ReadValue());
-
-            if (!Physics.Raycast(ray, out var hit, _click))
-            {
-                return;
-            }
-
-            var lying = Find(hit.collider != null ? hit.collider.gameObject : null);
-
-            if (lying != null)
-            {
-                Pick(lying);
+                Pick(aimed);
             }
         }
 
