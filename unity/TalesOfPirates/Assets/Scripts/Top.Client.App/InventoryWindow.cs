@@ -52,7 +52,7 @@ namespace Top.Client.App
         /// than geometry, so the spot a throw lands on is taken on the plane the hero
         /// stands on and kept this close to him.
         /// </summary>
-        private const float Reach = 8f;
+        private const float Reach = 2.5f;
 
         /// <summary>How much of the top of the window is the strip it is picked up by.</summary>
         private const float HeaderHeight = 36f;

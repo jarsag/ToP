@@ -36,10 +36,13 @@ namespace Top.Client.App
         /// <summary>Which way that model is turned, for one exported facing somewhere else.</summary>
         [SerializeField] private Vector3 _modelRotation = Vector3.zero;
 
-        /// <summary>How far alt and A reaches, in metres.</summary>
-        [SerializeField] private float _gather = 8f;
+        /// <summary>How far alt and A reaches, in metres, measured from the hero.</summary>
+        [SerializeField] private float _gather = 3f;
 
-        /// <summary>How far the right button can reach a bag, in metres.</summary>
+        /// <summary>How close the hero has to be to a thing to take it, in metres.</summary>
+        [SerializeField] private float _pick = 1.5f;
+
+        /// <summary>How far a ray may look for a bag to begin with, in metres.</summary>
         [SerializeField] private float _click = 40f;
 
         [SerializeField] private bool _debug = true;
@@ -155,9 +158,29 @@ namespace Top.Client.App
 
             var ray = camera.ScreenPointToRay(mouse.position.ReadValue());
 
-            return Physics.Raycast(ray, out var hit, _click)
-                ? Find(hit.collider != null ? hit.collider.gameObject : null)
-                : null;
+            if (!Physics.Raycast(ray, out var hit, _click))
+            {
+                return null;
+            }
+
+            var lying = Find(hit.collider != null ? hit.collider.gameObject : null);
+
+            // It is not enough for the pointer to be over a thing: the hero has to be almost
+            // beside it. The client made the player walk to what he wanted to pick up, and a
+            // click from across the map would otherwise reach it.
+            return lying != null && Close(lying) ? lying : null;
+        }
+
+        /// <summary>Whether the hero is near enough to a thing on the ground to take it.</summary>
+        private bool Close(Lying lying)
+        {
+            var hero = FindAnyObjectByType<HeroController>();
+            var from = hero != null ? hero.transform.position : transform.position;
+
+            var here = new Vector3(from.x, 0f, from.z);
+            var there = new Vector3(lying.To.x, 0f, lying.To.z);
+
+            return Vector3.Distance(here, there) <= _pick;
         }
 
         /// <summary>Walks every bag still in the air along its throw.</summary>
