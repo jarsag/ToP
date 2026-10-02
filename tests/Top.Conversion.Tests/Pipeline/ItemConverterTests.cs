@@ -67,6 +67,51 @@ namespace Top.Conversion.Tests.Pipeline
         }
 
         [Test]
+        public void An_item_no_framework_holds_converts_the_model_iteminfo_names()
+        {
+            // A coin, a gem, or the symbol that marks where a spot is: iteminfo
+            // names the file itself instead of numbering a part per framework,
+            // which is how 141 rows of this client are written.
+            _client.AddModel("item", "lgo/dirk.lgo", "target.lgo");
+
+            var item = new ItemInfoRecord
+            {
+                Id = 2295,
+                Name = "Movement Symbol",
+                Type = ItemType.General,
+                Modules = ["target", "0", "0", "0", "0"]
+            };
+
+            var result = Converter(item).Convert(2295);
+
+            Assert.That(result.Outcome, Is.EqualTo(ConversionOutcome.Converted));
+            Assert.That(result.Modules, Is.EqualTo(new[] { "target", null, null, null }));
+            Assert.That(result.ModuleArtifacts[0].ModelPath, Is.EqualTo(_client.Converted("item", "target")));
+            Assert.That(result.Artifacts.Count(), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Dressing_a_character_ignores_an_items_own_model()
+        {
+            // An own model is not a body part, so a character asking what its
+            // framework wears gets nothing from an item shaped that way.
+            _client.AddModel("item", "lgo/dirk.lgo", "target.lgo");
+
+            var item = new ItemInfoRecord
+            {
+                Id = 2295,
+                Name = "Movement Symbol",
+                Type = ItemType.General,
+                Modules = ["target", "0", "0", "0", "0"]
+            };
+
+            var result = Converter(item).ConvertModules(item, 1);
+
+            Assert.That(result.Outcome, Is.EqualTo(ConversionOutcome.Skipped));
+            Assert.That(result.Artifacts, Is.Empty);
+        }
+
+        [Test]
         public void A_wearable_takes_its_module_from_the_character_models()
         {
             _client.AddModel("character", "lgo/dirk.lgo", "worn0.lgo");

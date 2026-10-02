@@ -100,9 +100,22 @@ namespace Top.Conversion.Pipeline
 
             if (modules.All(module => module == null))
             {
-                Log.Warning($"item {item.Id} '{item.Name}' has no models for any model");
+                // Nothing wears it and nobody holds it, but it can still have a
+                // model of its own - a coin, a gem, a symbol that marks a spot.
+                // Dressing a character is the one case that cannot use it: there
+                // is no body part here to hang on a framework.
+                if (model != null || !ItemModules.TryGetOwnModel(item, out var own))
+                {
+                    Log.Warning($"item {item.Id} '{item.Name}' has no models for any model");
 
-                return new ItemResult(item.Id, item.Name, ConversionOutcome.Skipped, wearable, modules, artifacts);
+                    return new ItemResult(item.Id, item.Name, ConversionOutcome.Skipped, wearable, modules,
+                        artifacts);
+                }
+
+                modules[0] = own;
+                artifacts[0] = ConvertModule(item, wearable, own);
+
+                return new ItemResult(item.Id, item.Name, Outcome(artifacts), wearable, modules, artifacts);
             }
 
             if (model != null && ModuleFor(modules, model.Value) == null)

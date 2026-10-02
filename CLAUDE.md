@@ -23,7 +23,8 @@ A conversion is per family, and a converted tree only loads if it holds what a r
 - `map` - terrain and water of one map, plus the scene objects that map places, which it names
   by their sceneobjinfo id (`--no-objects` leaves them out).
 - `scene` - the models standing on a map (`models/scene/*.glb` + `textures/scene/*.png`).
-- `character`, `item` - converted into `rigs/` and `models/`, but nothing in the client reads them yet.
+- `character`, `item` - a character becomes a rig plus one model per body part and piece of equipment
+  (`rigs/`, `models/character/`); the hero wears them, and a mark on the map can be drawn from an item.
 
 So `--kind map --unit 32` is one map with the objects standing on it, while `--kinds map` converts
 every map in the client. The map region window deliberately draws ground and water only: scene
@@ -36,11 +37,21 @@ reads the tree, so it lists what the runtime will load.
 
 ## Playing
 
-`HeroController` walks the hero with WASD under a `FollowCamera`. `CameraMode`, added to the same
-camera, switches to free flight with Tab and back: WASD flies, Q/E go down and up, the right mouse
-button looks, the wheel changes speed, shift sprints. While flying it disables the follow camera and
-the hero's own controls, and points the preview's streaming at the camera - a camera flown away from
-the hero would otherwise stare at an empty scene, because chunks only build around the preview's focus.
+`HeroController` walks the hero where the player points: holding the left mouse button steers, letting
+it go leaves a mark on the ground at the destination, and the hero walks there along the map's height
+field. The keyboard belongs to the camera. `CameraMode`, added to the camera, switches with Tab between
+watching the hero and flying free: `IsometricCamera` keeps him in view and is preferred when the scene
+has one, `FollowCamera` is the fallback, and `FlyCamera` is the free one - WASD, Q/E down and up, the
+right mouse button looks, the wheel changes speed, shift sprints. While flying, the hero's controls are
+switched off and the preview's streaming follows the camera: a camera flown away from the hero would
+otherwise stare at an empty scene, because chunks only build around the preview's focus.
+
+A click does not raycast against geometry - there is none, the ground is a height field - so `MapRay`
+walks the ray forward and compares it with `MapData.HeightAt`, which lands on ground whose chunks are
+still streaming in. The mark is a `DestinationMarker` (it turns and hovers over the point it was put
+at), drawn from a prefab when one is assigned and made on the spot otherwise: the model its marker
+model names, which `ContentModel` loads out of the converted tree, or a flat disc when no model is
+named.
 
 `HeroModel`, added to the hero, dresses it in a converted character. A player character converts as
 parts: a rig (`rigs/<model>.glb`) that is a skeleton and its clips and draws nothing, and one file per
