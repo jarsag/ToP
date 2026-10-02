@@ -24,6 +24,12 @@ namespace Top.Client.App
         /// <summary>How wide the bag a dropped item is drawn as.</summary>
         [SerializeField] private float _size = 0.45f;
 
+        /// <summary>How fast what has landed turns, in degrees a second.</summary>
+        [SerializeField] private float _spin = 60f;
+
+        /// <summary>How far it rises and falls while it waits, in metres.</summary>
+        [SerializeField] private float _hover = 0.12f;
+
         /// <summary>How far alt and A reaches, in metres.</summary>
         [SerializeField] private float _gather = 8f;
 
@@ -94,6 +100,7 @@ namespace Top.Client.App
         private void Update()
         {
             Fly();
+            Spin();
             Clicked();
             Gathered();
         }
@@ -116,6 +123,29 @@ namespace Top.Client.App
                 at.y += _arc * Mathf.Sin(Mathf.PI * done);
 
                 lying.Bag.transform.position = lying.Left <= 0f ? lying.To : at;
+            }
+        }
+
+        /// <summary>
+        /// Turns and lifts what has landed, the way the mark a destination makes does:
+        /// something lying perfectly still does not read as something to pick up.
+        /// </summary>
+        private void Spin()
+        {
+            foreach (var lying in _lying)
+            {
+                if (lying.Bag == null || lying.Left > 0f)
+                {
+                    continue;
+                }
+
+                lying.Bag.transform.Rotate(0f, _spin * Time.deltaTime, 0f, Space.World);
+
+                var at = lying.To;
+
+                at.y += _hover * (1f + Mathf.Sin(Time.time * 2f)) * 0.5f;
+
+                lying.Bag.transform.position = at;
             }
         }
 
