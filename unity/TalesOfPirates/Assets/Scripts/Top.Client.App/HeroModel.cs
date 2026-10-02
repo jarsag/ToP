@@ -277,8 +277,6 @@ namespace Top.Client.App
         /// </summary>
         public async Task Wear(int slot, string path)
         {
-            TakeOff(slot);
-
             if (string.IsNullOrEmpty(path))
             {
                 return;
@@ -291,14 +289,25 @@ namespace Top.Client.App
                 return;
             }
 
+            ModelInstance instance;
+
             try
             {
-                _worn[slot] = await Add(path);
+                instance = await Add(path);
             }
             catch (Exception exception)
             {
                 Log.Error($"could not wear '{path}'", exception);
+
+                return;
             }
+
+            // Whatever stands in the slot by now goes before this arrives: something may
+            // have been put on while this was loading, and two of the same part on one body
+            // is a body wearing itself twice.
+            TakeOff(slot);
+
+            _worn[slot] = instance;
         }
 
         /// <summary>Takes off whatever covers a slot, leaving the body as it is.</summary>

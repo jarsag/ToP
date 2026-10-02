@@ -324,6 +324,8 @@ namespace Top.Client.App
 
             // A marked spawn point is where the hero starts, and a map with none
             // leaves him exactly where the scene put him.
+            Log.Info($"the scene has {Zone.Summary()}");
+
             if (_spawnOnZone && Zone.TryRandomSpawn(out var spawn))
             {
                 var point = MapSpace.ToMap(spawn);

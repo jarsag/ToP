@@ -31,6 +31,7 @@ namespace Top.Client.Game.World
         [SerializeField] private Vector2 _size = new Vector2(64f, 64f);
 
         private static Zone[] _zones;
+        private static float _looked;
 
         /// <summary>What the zone is for.</summary>
         public ZoneKind Kind
@@ -112,6 +113,48 @@ namespace Top.Client.Game.World
             return true;
         }
 
+        /// <summary>
+        /// Whether every zone the list names is still there. A list kept from an earlier
+        /// run of the game is not: the objects it names have been destroyed, and a list of
+        /// dead zones finds no spawn point at all.
+        /// </summary>
+        private static bool Alive(Zone[] zones)
+        {
+            foreach (var zone in zones)
+            {
+                if (zone == null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        /// <summary>What the scene's zones are, counted by kind, which is what a line of the log says.</summary>
+        public static string Summary()
+        {
+            var safe = 0;
+            var spawns = 0;
+
+            foreach (var zone in Zones())
+            {
+                if (zone == null)
+                {
+                    continue;
+                }
+
+                if (zone._kind == ZoneKind.Spawn)
+                {
+                    spawns++;
+                }
+                else
+                {
+                    safe++;
+                }
+            }
+
+            return $"{safe} safe zone(s), {spawns} spawn point(s)";
+        }
         /// <summary>The colour a kind is drawn in, which is the only thing telling two kinds apart in a scene.</summary>
         public static Color Colour(ZoneKind kind)
         {
@@ -140,11 +183,12 @@ namespace Top.Client.Game.World
         /// </summary>
         private static Zone[] Zones()
         {
-            if (_zones != null && _zones.Length > 0)
+            if (_zones != null && _zones.Length > 0 && Time.realtimeSinceStartup - _looked < 1f && Alive(_zones))
             {
                 return _zones;
             }
 
+            _looked = Time.realtimeSinceStartup;
             _zones = FindObjectsByType<Zone>();
 
             return _zones;
