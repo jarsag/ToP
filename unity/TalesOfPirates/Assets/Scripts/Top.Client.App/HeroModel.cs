@@ -275,6 +275,81 @@ namespace Top.Client.App
         /// the slot's own off when the path is empty: a coat over a back, a hat on a
         /// head, and one of each at a time.
         /// </summary>
+        /// <summary>The slots a thing is carried in rather than worn on.</summary>
+        private const int RightHand = 5;
+
+        private const int LeftHand = 6;
+
+        /// <summary>How a carried thing sits on its mount, which the model's own axes decide.</summary>
+        [SerializeField] private Vector3 _carryRotation = Vector3.zero;
+
+        [SerializeField] private float _carryScale = 1f;
+
+        /// <summary>Whether a slot is one a thing is carried in rather than worn on.</summary>
+        private static bool Carried(int slot)
+        {
+            return slot == RightHand || slot == LeftHand;
+        }
+
+        /// <summary>
+        /// Puts a carried thing on the mount the client's rig keeps for it. A weapon is not
+        /// a part of the body: it is a model whose own skeleton nothing drives, so it is hung
+        /// by a holder on a dummy of the rig and goes wherever that dummy goes.
+        /// </summary>
+        private async Task Carry(int slot, string path)
+        {
+            if (_store == null)
+            {
+                return;
+            }
+
+            var mount = Find(slot == LeftHand ? "dummy_6" : "dummy_9");
+
+            if (mount == null)
+            {
+                Log.Warning($"the rig has no mount for '{path}'");
+
+                return;
+            }
+
+            var holder = new GameObject($"Carried {path}");
+
+            holder.transform.SetParent(mount, worldPositionStays: false);
+            holder.transform.localRotation = Quaternion.Euler(_carryRotation);
+            holder.transform.localScale = Vector3.one * _carryScale;
+
+            ModelInstance instance;
+
+            try
+            {
+                instance = await _store.Instantiate(path, holder.transform);
+            }
+            catch (Exception exception)
+            {
+                Log.Error($"could not carry '{path}'", exception);
+
+                return;
+            }
+
+            TakeOff(slot);
+
+            _worn[slot] = instance;
+        }
+
+        /// <summary>A dummy of the rig, by the name the client gives it.</summary>
+        private Transform Find(string name)
+        {
+            foreach (var child in GetComponentsInChildren<Transform>())
+            {
+                if (child.name == name)
+                {
+                    return child;
+                }
+            }
+
+            return null;
+        }
+
         public async Task Wear(int slot, string path)
         {
             if (string.IsNullOrEmpty(path))
@@ -286,6 +361,15 @@ namespace Top.Client.App
 
             if (_store == null || _model == null || _rigClips.Clips == null)
             {
+                return;
+            }
+
+            // A weapon is carried in a hand rather than worn on the body, so it does not go
+            // through the parts a body is dressed in.
+            if (Carried(slot))
+            {
+                await Carry(slot, path);
+
                 return;
             }
 
