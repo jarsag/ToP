@@ -352,20 +352,36 @@ namespace Top.Client.App
         /// <summary>A dummy of the rig, by the name the client gives it.</summary>
         private Transform Find(string name)
         {
-            // The rig draws nothing and the loader may have switched it off, and a search
-            // that walks only what is switched on would never see the mounts inside it. The
-            // whole hero is searched instead, dormant objects and all, and the name is
-            // matched loosely because a loader may add to it.
+            // Every part of a character carries its own copy of the skeleton, so a mount by
+            // this name exists several times over - and one of the copies sits inside the rig,
+            // which draws nothing and may well be switched off. Anything hung on a switched
+            // off object is switched off with it, so a live mount is taken first and a
+            // sleeping one only when there is nothing else. The name is matched loosely
+            // because a loader may add to it.
+            Transform sleeping = null;
+
             foreach (var child in transform.root.GetComponentsInChildren<Transform>(true))
             {
-                if (string.Equals(child.name, name, StringComparison.OrdinalIgnoreCase) ||
-                    child.name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (!string.Equals(child.name, name, StringComparison.OrdinalIgnoreCase) &&
+                    child.name.IndexOf(name, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                if (child.gameObject.activeInHierarchy)
                 {
                     return child;
                 }
+
+                sleeping = sleeping != null ? sleeping : child;
             }
 
-            return null;
+            if (sleeping != null)
+            {
+                Log.Warning($"the mount '{name}' sits inside something switched off, so what is hung on it will not be drawn");
+            }
+
+            return sleeping;
         }
 
         public async Task Wear(int slot, string path)
