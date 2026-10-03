@@ -490,6 +490,43 @@ namespace Top.Client.App
                     Said($"the bag starts with {Called(_slots[i])} in {At(i)}");
                 }
             }
+
+            Snapshot("as the bag is filled");
+            Settle();
+        }
+
+        /// <summary>How many cells hold something, and what they hold, as one line.</summary>
+        private void Snapshot(string when)
+        {
+            var held = 0;
+            var list = string.Empty;
+
+            for (var i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i] == 0)
+                {
+                    continue;
+                }
+
+                held++;
+                list += list.Length == 0 ? $"{At(i)}={_slots[i]}" : $", {At(i)}={_slots[i]}";
+            }
+
+            var owned = _inventory != null ? _inventory.Owned.Count : 0;
+
+            Said($"{when}: {held} item(s) in the bag, {owned} owned - {list}");
+        }
+
+        /// <summary>
+        /// Says what the bag holds once the start of the game has had time to finish. The
+        /// window fills the bag as soon as it is built, while the character's own set is
+        /// being put on at the same time, so a thing that goes missing goes missing then.
+        /// </summary>
+        private async void Settle()
+        {
+            await System.Threading.Tasks.Task.Delay(2000);
+
+            Snapshot("two seconds after the start");
         }
 
         /// <summary>Empties the cell an item stands in, which is what putting it on does.</summary>
