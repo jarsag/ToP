@@ -337,7 +337,7 @@ GameObject:
   - component: {fileID: 421014450}
   - component: {fileID: 421014451}
   m_Layer: 0
-  m_Name: Spawn point
+  m_Name: Spawn point 2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -733,7 +733,6 @@ GameObject:
   - component: {fileID: 1959073040}
   - component: {fileID: 1959073042}
   - component: {fileID: 1959073041}
-  - component: {fileID: 1959073043}
   - component: {fileID: 1959073044}
   m_Layer: 0
   m_Name: Hero
@@ -862,6 +861,8 @@ MonoBehaviour:
   _body:
   - models/character/0003000000.glb
   _class: 3
+  _warRun: 0003_61
+  _warWait: 0003_04_waiting2
   _idle: 0003_01_waiting
   _move: 0003_05_run
   _warIdle: 0003_04_waiting2
@@ -872,6 +873,9 @@ MonoBehaviour:
   _yaw: 0
   _scale: 1
   _hidePlaceholder: 1
+  _carryRotation: {x: 0, y: 0, z: 0}
+  _backRotation: {x: 0, y: 0, z: 0}
+  _carryScale: 1
 --- !u!114 &1959073042
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -887,22 +891,6 @@ MonoBehaviour:
   _preview: {fileID: 0}
   _hero: {fileID: 0}
   _owned: 940800006701000017020000c7020000630000008f130000i
-  _own: c6080000d00100008002000030030000i
---- !u!114 &1959073043
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1959073035}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6c4f8a2e1d9b47c3a5e0d7b2f9c31a58, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Top.Client.App::Top.Client.App.Inventory
-  _preview: {fileID: 0}
-  _hero: {fileID: 0}
-  _owned: 940800006701000017020000c7020000i
   _own: c6080000d00100008002000030030000i
 --- !u!114 &1959073044
 MonoBehaviour:

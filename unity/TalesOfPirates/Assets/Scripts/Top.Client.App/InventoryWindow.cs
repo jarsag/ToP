@@ -526,6 +526,25 @@ namespace Top.Client.App
         {
             await System.Threading.Tasks.Task.Delay(2000);
 
+            // More than one inventory in a scene is a trap: everything that wants one takes
+            // whichever it finds first, so the bag can be filled from one while the hero is
+            // dressed from another - things go missing from the bag, a model can be dressed
+            // twice, and which way it falls changes from run to run. Better said out loud.
+            var found = FindObjectsByType<Inventory>();
+
+            if (found.Length > 1)
+            {
+                var where = string.Empty;
+
+                foreach (var one in found)
+                {
+                    where += where.Length == 0 ? one.gameObject.name : $", {one.gameObject.name}";
+                }
+
+                Log.Warning($"there are {found.Length} inventories in the scene ({where}); " +
+                            "only one of them can be the bag the hero is dressed from");
+            }
+
             // The bag is filled the moment the window is built, and the inventory may not
             // have had its say by then - which is why a thing added to it turned up in the bag
             // on some runs and not on others. Whatever is owned, is not already in the bag and
