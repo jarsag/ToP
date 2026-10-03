@@ -300,6 +300,8 @@ namespace Top.Client.App
         {
             if (_store == null)
             {
+                Log.Warning($"cannot carry '{path}': the hero has not finished loading");
+
                 return;
             }
 
@@ -347,6 +349,38 @@ namespace Top.Client.App
             TakeOff(slot);
 
             _worn[slot] = instance;
+
+            Tell(path, mount, holder, instance);
+        }
+
+        /// <summary>
+        /// What a carried thing turned out to be, for when nothing shows on screen: which
+        /// mount it went on and whether that mount is switched on, where the holder stands,
+        /// and what the model that came back covers. A model drawn at a scale of its own is
+        /// the usual reason for a weapon that is there and yet invisible.
+        /// </summary>
+        private static void Tell(string path, Transform mount, GameObject holder, ModelInstance instance)
+        {
+            var renderers = holder.GetComponentsInChildren<Renderer>(true);
+            var on = 0;
+            var bounds = new Bounds(holder.transform.position, Vector3.zero);
+
+            foreach (var renderer in renderers)
+            {
+                if (renderer.enabled && renderer.gameObject.activeInHierarchy)
+                {
+                    on++;
+                }
+
+                bounds.Encapsulate(renderer.bounds);
+            }
+
+            var parent = mount.parent != null ? mount.parent.name : "nothing";
+
+            Log.Info($"carried '{path}': mount '{mount.name}' under '{parent}' at {mount.position} " +
+                     $"(switched on: {mount.gameObject.activeInHierarchy}), holder at {holder.transform.position} " +
+                     $"(scale {holder.transform.localScale.x}), {renderers.Length} renderer(s), {on} of them on, " +
+                     $"covering centre {bounds.center} size {bounds.size}, instance={instance != null}");
         }
 
         /// <summary>A dummy of the rig, by the name the client gives it.</summary>
