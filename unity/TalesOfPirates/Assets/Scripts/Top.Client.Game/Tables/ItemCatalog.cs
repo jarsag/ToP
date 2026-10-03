@@ -71,7 +71,23 @@ namespace Top.Client.Game.Tables
                 return null;
             }
 
-            return models[playerClass];
+            if (!string.IsNullOrEmpty(models[playerClass]))
+            {
+                return models[playerClass];
+            }
+
+            // A class the item was not drawn for is no reason to refuse it: every class
+            // shares one skeleton, so a weapon drawn for another stands on this one just as
+            // well, and any hero is meant to be able to carry anything.
+            foreach (var model in models)
+            {
+                if (!string.IsNullOrEmpty(model))
+                {
+                    return model;
+                }
+            }
+
+            return null;
         }
     }
 }

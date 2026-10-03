@@ -67,7 +67,7 @@ namespace Top.Conversion.Pipeline.Tables
                 Icon = string.IsNullOrEmpty(row.Icon) || row.Icon == "0" ? null : row.Icon,
                 DropModel = DropModel(row),
                 Models = models.Any(path => path != null) ? models : null,
-                Slot = slot,
+                Slot = slot == 0 ? Hand((int)row.Type) : slot,
             };
         }
 
@@ -76,6 +76,31 @@ namespace Top.Conversion.Pipeline.Tables
         /// the last digit of the module's name: 0003190001 is the first, 0003610002
         /// the second, and a face - 0003000000 - covers none of them.
         /// </summary>
+        /// <summary>
+        /// Which hand an item is carried in, out of the type the client gives it: swords,
+        /// two handed swords, bows, guns, daggers and staves in the right hand, a shield or
+        /// a left hand guard in the left. Zero for what is worn on the body instead, and for
+        /// what is not carried at all - arrows, potions, materials.
+        /// </summary>
+        private static int Hand(int type)
+        {
+            switch (type)
+            {
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+                case 7:
+                case 9:
+                    return 5;
+                case 6:
+                case 11:
+                    return 6;
+                default:
+                    return 0;
+            }
+        }
+
         private static int Slot(string module)
         {
             var last = module.Length > 0 ? module[module.Length - 1] : '0';

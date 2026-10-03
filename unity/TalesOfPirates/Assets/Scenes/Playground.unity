@@ -886,7 +886,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Top.Client.App::Top.Client.App.Inventory
   _preview: {fileID: 0}
   _hero: {fileID: 0}
-  _owned: 940800006701000017020000c7020000i
+  _owned: 940800006701000017020000c7020000630000008f130000i
   _own: c6080000d00100008002000030030000i
 --- !u!114 &1959073043
 MonoBehaviour:

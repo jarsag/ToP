@@ -96,6 +96,7 @@ namespace Top.Client.App
         private static readonly Dictionary<int, string> Worn = new Dictionary<int, string>
         {
             { 1, "cmdArmet" }, { 2, "cmdBody" }, { 3, "cmdGlove" }, { 4, "cmdShoes" },
+            { 5, "cmdRightHand" }, { 6, "cmdLeftHand" },
         };
 
         [SerializeField] private Inventory _inventory;
