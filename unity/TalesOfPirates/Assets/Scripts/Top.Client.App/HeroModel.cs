@@ -303,11 +303,24 @@ namespace Top.Client.App
                 return;
             }
 
-            var mount = Find(slot == LeftHand ? "dummy_6" : "dummy_9");
+            // The dummy the client keeps for this, and failing that the bone it hangs from:
+            // either will carry the thing, and a bone is better than nothing.
+            var mount = Find(slot == LeftHand ? "dummy_6" : "dummy_9")
+                        ?? Find(slot == LeftHand ? "Bip01 L Hand" : "Bip01 R Hand");
 
             if (mount == null)
             {
-                Log.Warning($"the rig has no mount for '{path}'");
+                var held = new List<string>();
+
+                foreach (var child in transform.root.GetComponentsInChildren<Transform>(true))
+                {
+                    if (held.Count < 24)
+                    {
+                        held.Add(child.name);
+                    }
+                }
+
+                Log.Warning($"the rig has no mount for '{path}'; the hero holds: {string.Join(", ", held)}");
 
                 return;
             }
@@ -339,9 +352,14 @@ namespace Top.Client.App
         /// <summary>A dummy of the rig, by the name the client gives it.</summary>
         private Transform Find(string name)
         {
-            foreach (var child in GetComponentsInChildren<Transform>())
+            // The rig draws nothing and the loader may have switched it off, and a search
+            // that walks only what is switched on would never see the mounts inside it. The
+            // whole hero is searched instead, dormant objects and all, and the name is
+            // matched loosely because a loader may add to it.
+            foreach (var child in transform.root.GetComponentsInChildren<Transform>(true))
             {
-                if (child.name == name)
+                if (string.Equals(child.name, name, StringComparison.OrdinalIgnoreCase) ||
+                    child.name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return child;
                 }
