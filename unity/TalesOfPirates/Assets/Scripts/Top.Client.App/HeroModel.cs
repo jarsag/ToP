@@ -327,6 +327,21 @@ namespace Top.Client.App
                 return;
             }
 
+            // The rig draws nothing and the loader may have switched it off, and a weapon hung
+            // inside something switched off is switched off with it - which is exactly what
+            // happened: the mount was found, the model loaded, and nothing was drawn. The branch
+            // the mount hangs in holds the skeleton and nothing else, so switching it on shows
+            // no more than the weapon that was hung there.
+            if (!mount.gameObject.activeInHierarchy)
+            {
+                for (var at = mount; at != null && at != transform.root; at = at.parent)
+                {
+                    at.gameObject.SetActive(true);
+                }
+
+                Log.Info($"the branch holding '{mount.name}' was switched off and is now on, so what hangs on it is drawn");
+            }
+
             var holder = new GameObject($"Carried {path}");
 
             holder.transform.SetParent(mount, worldPositionStays: false);
