@@ -17,9 +17,7 @@ namespace Top.Client.App
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
 
-        private Vector3 _rotation;
-
-        private float _scale = 1f;
+        private HeroModel _hero;
 
         private Transform _mount;
 
@@ -28,11 +26,10 @@ namespace Top.Client.App
         private bool _hung;
 
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
-        public void Belong(int slot, Vector3 rotation, float scale)
+        public void Belong(HeroModel hero, int slot)
         {
+            _hero = hero;
             _slot = slot;
-            _rotation = rotation;
-            _scale = scale;
             _hung = false;
         }
 
@@ -40,15 +37,30 @@ namespace Top.Client.App
         {
             var safe = Zone.IsSafe(transform.root.position);
 
-            if (_hung && safe == _safe && _mount != null)
+            if (!_hung || safe != _safe || _mount == null)
+            {
+                _hung = true;
+                _safe = safe;
+
+                Hang(safe);
+            }
+
+            // The way it sits is read every frame rather than once: the angles are tuned in the
+            // inspector while the game runs, and a weapon that ignored a change until the next
+            // time it was put on would be a weapon nobody could line up.
+            Dress(safe);
+        }
+
+        /// <summary>Puts the thing the way the hero says it should look, in hand or on back.</summary>
+        private void Dress(bool safe)
+        {
+            if (_hero == null)
             {
                 return;
             }
 
-            _hung = true;
-            _safe = safe;
-
-            Hang(safe);
+            transform.localRotation = Quaternion.Euler(safe ? _hero.BackRotation : _hero.HandRotation);
+            transform.localScale = Vector3.one * _hero.CarryScale;
         }
 
         /// <summary>Puts the thing on the mount the state asks for.</summary>
@@ -74,8 +86,6 @@ namespace Top.Client.App
             }
 
             transform.SetParent(mount, worldPositionStays: false);
-            transform.localRotation = Quaternion.Euler(_rotation);
-            transform.localScale = Vector3.one * _scale;
 
             if (_mount != mount)
             {

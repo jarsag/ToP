@@ -54,6 +54,19 @@ namespace Top.Client.App
         /// Clips as the converter names them: model, action number, action. These
         /// are the ones played where the hero is safe.
         /// </summary>
+        [Header("Animations")]
+
+        /// <summary>
+        /// The clip a hero at war with a weapon in a hand runs with, and the one he waits with,
+        /// named as it appears in the rig - the inspector offers the rig's own clips to choose
+        /// from. Empty means nothing changes. They are used only at war with a weapon in a hand:
+        /// in a safe zone the weapon is on the hero's back and the plain clips play.
+        /// </summary>
+        [SerializeField] private string _warRun = string.Empty;
+
+        [SerializeField] private string _warWait = string.Empty;
+
+
         [SerializeField] private string _idle = "0003_01_waiting";
         [SerializeField] private string _move = "0003_05_run";
 
@@ -280,10 +293,127 @@ namespace Top.Client.App
 
         private const int LeftHand = 6;
 
-        /// <summary>How a carried thing sits on its mount, which the model's own axes decide.</summary>
+        /// <summary>How a carried thing sits in a hand, which the model's own axes decide.</summary>
         [SerializeField] private Vector3 _carryRotation = Vector3.zero;
 
+        /// <summary>
+        /// How it sits on the back. It is a setting of its own because a weapon lying across a
+        /// back is turned differently from the same weapon held upright in a hand - the client
+        /// keeps them apart for the same reason.
+        /// </summary>
+        [SerializeField] private Vector3 _backRotation = new Vector3(0f, 180f, 0f);
+
         [SerializeField] private float _carryScale = 1f;
+
+
+        /// <summary>How a carried thing sits in a hand, for whatever is hanging on one.</summary>
+        public Vector3 HandRotation => _carryRotation;
+
+        /// <summary>How it sits on a back, which is a different angle from a hand.</summary>
+        public Vector3 BackRotation => _backRotation;
+
+        /// <summary>How big a carried thing is drawn.</summary>
+        public float CarryScale => _carryScale;
+
+        /// <summary>
+        /// Whether a weapon is in a hand, which is when the hero is at war and moves the way a
+        /// hero with a weapon moves instead of the way an empty handed one does.
+        /// </summary>
+        private bool Armed()
+        {
+            if (Safe)
+            {
+                return false;
+            }
+
+            return _worn.ContainsKey(RightHand) || _worn.ContainsKey(LeftHand);
+        }
+
+        /// <summary>
+        /// Which clip actually plays. The numbers the client used for a hero with a weapon are
+        /// not written down anywhere, so they are settings; a clip that is one of the ways of
+        /// running, flying aside, gives way to the armed one when there is one.
+        /// </summary>
+        private string Ask(string name)
+        {
+            if (string.IsNullOrEmpty(name) || !Armed())
+            {
+                return name;
+            }
+
+            var run = string.IsNullOrEmpty(_warRun) ? null : _warRun;
+            var wait = string.IsNullOrEmpty(_warWait) ? null : _warWait;
+
+            if (run != null && Running(name))
+            {
+                return run;
+            }
+
+            if (wait != null && name.IndexOf("waiting", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return wait;
+            }
+
+            return name;
+        }
+
+        /// <summary>
+        /// The first of a list of clips that the rig actually has, or null when it has none of
+        /// them. Which number belongs to which weapon is not written down anywhere, so a list can
+        /// hold the guesses and the one that exists is the one that plays.
+        /// </summary>
+        private string First(string[] clips)
+        {
+            if (clips == null)
+            {
+                return null;
+            }
+
+            foreach (var clip in clips)
+            {
+                if (string.IsNullOrEmpty(clip))
+                {
+                    continue;
+                }
+
+                foreach (var animation in _animations)
+                {
+                    if (animation != null && animation.GetClip(clip) != null)
+                    {
+                        return clip;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+
+        /// <summary>Whether a clip is one of the ways of running, flying aside.</summary>
+        private static bool Running(string name)
+        {
+            return name.IndexOf("run", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                   name.IndexOf("fly", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        /// <summary>
+        /// A clip to hold the hero in while the rig's animations are being looked through. While
+        /// one is set the hero plays nothing of its own, so a clip picked by hand stays put
+        /// instead of being replaced the moment the state changes.
+        /// </summary>
+        public string Holding { get; set; }
+
+        /// <summary>Whether a clip is being held for looking through the animations.</summary>
+        public bool Held => !string.IsNullOrEmpty(Holding);
+
+        /// <summary>Lets go of a held clip and takes the hero's own animation back.</summary>
+        public void LetGo()
+        {
+            Holding = null;
+            _playing = null;
+
+            Play(_idle, _rate);
+        }
 
         /// <summary>Whether a slot is one a thing is carried in rather than worn on.</summary>
         private static bool Carried(int slot)
@@ -340,6 +470,11 @@ namespace Top.Client.App
                 }
 
                 Log.Info($"the branch holding '{mount.name}' was switched off and is now on, so what hangs on it is drawn");
+
+                // A branch switched on after the clips were handed out never started playing
+                // them, and a skeleton that stands still leaves what hangs on it standing still
+                // beside a hand that moves - so the clip is started on it again.
+                Play(_playing, _rate);
             }
 
             var holder = new GameObject($"Carried {path}");
@@ -348,7 +483,7 @@ namespace Top.Client.App
 
             // Which mount it hangs on is not settled once: a weapon is in the hand out of a
             // safe zone and on the back inside one, and the thing watches for that itself.
-            holder.AddComponent<CarriedItem>().Belong(slot, _carryRotation, _carryScale);
+            holder.AddComponent<CarriedItem>().Belong(this, slot);
             holder.transform.localRotation = Quaternion.Euler(_carryRotation);
             holder.transform.localScale = Vector3.one * _carryScale;
 
@@ -365,9 +500,30 @@ namespace Top.Client.App
                 return;
             }
 
+            // The model's own animation is stopped now that there is a model to stop. A weapon
+            // hung on a hand is carried rather than performed: left to play, its own clip runs
+            // beside the hero and the two drift apart.
+            foreach (var animator in holder.GetComponentsInChildren<Animator>(true))
+            {
+                animator.enabled = false;
+            }
+
+            foreach (var playing in holder.GetComponentsInChildren<Animation>(true))
+            {
+                playing.Stop();
+                playing.enabled = false;
+            }
+
+            // The skeleton the weapon hangs on is a copy of the hero's, and a copy that started
+            // its clip at a different moment walks a different step. Playing the current clip
+            // again lines it up with the parts that are already moving.
+            Play(_playing, _rate);
+
             TakeOff(slot);
 
             _worn[slot] = instance;
+
+
 
             Tell(path, mount, holder, instance);
         }
@@ -431,7 +587,7 @@ namespace Top.Client.App
 
             if (sleeping != null)
             {
-                Log.Warning($"the mount '{name}' sits inside something switched off, so what is hung on it will not be drawn");
+                Log.Info($"the mount '{name}' is inside something switched off; it is switched on to hang this on");
             }
 
             return sleeping;
@@ -479,6 +635,8 @@ namespace Top.Client.App
             TakeOff(slot);
 
             _worn[slot] = instance;
+
+
         }
 
         /// <summary>Takes off whatever covers a slot, leaving the body as it is.</summary>
@@ -527,6 +685,22 @@ namespace Top.Client.App
         private void Play(string name, float rate)
         {
             _rate = rate;
+
+            if (Held)
+            {
+                // Something is being looked through by hand, and it is not for the hero to
+                // replace the clip he was given.
+                return;
+            }
+
+            var wanted = Ask(name);
+
+            if (wanted != name)
+            {
+                Play(wanted, rate);
+
+                return;
+            }
 
             if (_animations.Count == 0 || string.IsNullOrEmpty(name))
             {
