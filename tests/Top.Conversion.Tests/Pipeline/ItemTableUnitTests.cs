@@ -48,12 +48,14 @@ namespace Top.Conversion.Tests.Pipeline
         }
 
         [Test]
-        public void A_held_item_comes_from_the_item_models_and_covers_no_slot()
+        public void A_held_item_comes_from_the_item_models_and_is_carried_in_a_hand()
         {
+            // A sword is carried rather than worn, so it has no place on the body - but it does
+            // have a hand, which the client decides by the type of the item.
             var entry = Entry(Item(1, "Short Sword", ItemType.Sword, "w0001", "10100001"));
 
             Assert.That(entry.Models[0], Is.EqualTo("models/item/10100001.glb"));
-            Assert.That(entry.Slot, Is.EqualTo(0), "a sword is held rather than worn");
+            Assert.That(entry.Slot, Is.EqualTo(5), "a sword is carried in the right hand");
         }
 
         [Test]
