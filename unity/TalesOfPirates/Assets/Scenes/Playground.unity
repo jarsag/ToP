@@ -734,6 +734,7 @@ GameObject:
   - component: {fileID: 1959073042}
   - component: {fileID: 1959073041}
   - component: {fileID: 1959073044}
+  - component: {fileID: 1959073045}
   m_Layer: 0
   m_Name: Hero
   m_TagString: Untagged
@@ -875,7 +876,13 @@ MonoBehaviour:
   _hidePlaceholder: 1
   _carryRotation: {x: 0, y: 0, z: 0}
   _backRotation: {x: 0, y: 0, z: 0}
+  _carryOffset: {x: 0, y: 0, z: 0}
+  _backOffset: {x: 0, y: 0, z: 0}
   _carryScale: 1
+  _mountRight: dummy_9
+  _mountLeft: dummy_6
+  _backRight: dummy_21
+  _backLeft: dummy_21
 --- !u!114 &1959073042
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -910,6 +917,28 @@ MonoBehaviour:
   _open: 0
   _debug: 1
   _scale: 1
+--- !u!114 &1959073045
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1959073035}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67ddc59beb62def4784368d52bcbdd11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Top.Client.App::Top.Client.App.EffectView
+  _on: 0
+  _effect: jj03
+  _mount: dummy_1
+  _withWeapon: 1
+  _holderTurn: {x: 270, y: 0, z: 0}
+  _key: 1
+  _life: 4.5
+  _rate: 6
+  _spin: 60
+  _scale: 0.9
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

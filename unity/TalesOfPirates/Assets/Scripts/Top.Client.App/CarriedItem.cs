@@ -19,6 +19,9 @@ namespace Top.Client.App
 
         private HeroModel _hero;
 
+        /// <summary>Where it hangs now, for anything that wants to hang beside it - an effect, say.</summary>
+        public Transform Where => _mount;
+
         private string _name;
 
         private Transform _mount;
