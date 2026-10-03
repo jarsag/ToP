@@ -19,6 +19,8 @@ namespace Top.Client.App
 
         private HeroModel _hero;
 
+        private string _name;
+
         private Transform _mount;
 
         private bool _safe;
@@ -37,7 +39,11 @@ namespace Top.Client.App
         {
             var safe = Zone.IsSafe(transform.root.position);
 
-            if (!_hung || safe != _safe || _mount == null)
+            // Hung again not only when the state changes but whenever the name it should hang on does,
+            // which is what makes pointing one at a node work while the game runs.
+            var wanted = Mount(safe);
+
+            if (!_hung || safe != _safe || _mount == null || _name != wanted)
             {
                 _hung = true;
                 _safe = safe;
@@ -60,6 +66,7 @@ namespace Top.Client.App
             }
 
             transform.localRotation = Quaternion.Euler(safe ? _hero.BackRotation : _hero.HandRotation);
+            transform.localPosition = safe ? _hero.BackOffset : _hero.CarryOffset;
             transform.localScale = Vector3.one * _hero.CarryScale;
         }
 
@@ -87,6 +94,8 @@ namespace Top.Client.App
 
             transform.SetParent(mount, worldPositionStays: false);
 
+            _name = name;
+
             if (_mount != mount)
             {
                 _mount = mount;
@@ -98,12 +107,19 @@ namespace Top.Client.App
         /// <summary>Which dummy it hangs on, out of the hand it belongs to and the state.</summary>
         private string Mount(bool safe)
         {
-            if (_slot == 6)
+            if (_hero == null)
             {
-                return safe ? "dummy_21" : "dummy_6";
+                return _slot == 6 ? "dummy_6" : "dummy_9";
             }
 
-            return safe ? "dummy_2" : "dummy_9";
+            // Asked every frame rather than remembered: the names are settings, and one of them can
+            // be pointed at a node while the game runs.
+            if (_slot == 6)
+            {
+                return safe ? _hero.BackLeft : _hero.MountLeft;
+            }
+
+            return safe ? _hero.BackRight : _hero.MountRight;
         }
 
         /// <summary>A dummy of the hero, preferring one that is switched on.</summary>

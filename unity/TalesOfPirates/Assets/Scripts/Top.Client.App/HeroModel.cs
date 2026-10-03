@@ -303,6 +303,15 @@ namespace Top.Client.App
         /// </summary>
         [SerializeField] private Vector3 _backRotation = new Vector3(0f, 180f, 0f);
 
+        /// <summary>
+        /// How far a carried thing is moved from the point it hangs on. A model's own origin is
+        /// wherever its author left it, and one that hangs a metre away from the hand is a model
+        /// whose geometry does not start at its root - the offset is the cure for that.
+        /// </summary>
+        [SerializeField] private Vector3 _carryOffset = Vector3.zero;
+
+        [SerializeField] private Vector3 _backOffset = Vector3.zero;
+
         [SerializeField] private float _carryScale = 1f;
 
 
@@ -311,6 +320,12 @@ namespace Top.Client.App
 
         /// <summary>How it sits on a back, which is a different angle from a hand.</summary>
         public Vector3 BackRotation => _backRotation;
+
+        /// <summary>How far it is moved from the point it hangs on, in the hand.</summary>
+        public Vector3 CarryOffset => _carryOffset;
+
+        /// <summary>How far it is moved from the point it hangs on, on the back.</summary>
+        public Vector3 BackOffset => _backOffset;
 
         /// <summary>How big a carried thing is drawn.</summary>
         public float CarryScale => _carryScale;
@@ -413,6 +428,64 @@ namespace Top.Client.App
             _playing = null;
 
             Play(_idle, _rate);
+        }
+
+
+        /// <summary>
+        /// Where a carried thing hangs: the dummy the rig keeps for each hand, and the one on the
+        /// back for a weapon at rest. They are settings rather than names written into the code
+        /// because which dummy is which is the client's business, and its spine keeps three of
+        /// them - dummy_2, dummy_21, dummy_22 - with no telling from the names which is behind.
+        /// A bone does just as well: Bip01 R Hand, Bip01 Spine1, anything with a transform.
+        /// </summary>
+        [Header("Carried weapon")]
+        [SerializeField] private string _mountRight = "dummy_9";
+
+        [SerializeField] private string _mountLeft = "dummy_6";
+
+        [SerializeField] private string _backRight = "dummy_2";
+
+        [SerializeField] private string _backLeft = "dummy_21";
+
+        /// <summary>Where the thing in the right hand hangs, and in the left, at war.</summary>
+        public string MountRight => _mountRight;
+
+        public string MountLeft => _mountLeft;
+
+        /// <summary>And where each hangs in a safe zone, on the hero's back.</summary>
+        public string BackRight => _backRight;
+
+        public string BackLeft => _backLeft;
+
+        /// <summary>
+        /// Points one of the four at a node, for lining a weapon up by hand: the debug view names
+        /// every node the rig has, and choosing one says that this is where the thing hangs. The
+        /// carried thing reads these every frame, so the change is seen at once.
+        /// </summary>
+        public void HangOn(string mount, bool left, bool onBack)
+        {
+            if (onBack)
+            {
+                if (left)
+                {
+                    _backLeft = mount;
+                }
+                else
+                {
+                    _backRight = mount;
+                }
+            }
+            else
+            {
+                if (left)
+                {
+                    _mountLeft = mount;
+                }
+                else
+                {
+                    _mountRight = mount;
+                }
+            }
         }
 
         /// <summary>Whether a slot is one a thing is carried in rather than worn on.</summary>
@@ -685,6 +758,18 @@ namespace Top.Client.App
         private void Play(string name, float rate)
         {
             _rate = rate;
+
+            // The rig is the skeleton the clips came from, and it draws nothing - so it was never one
+            // of the parts that animate themselves, and its bones and hanging points stood in their
+            // rest pose while the hero ran. Anything hung on one of those points stood there with it.
+            // It is taken in here, and plays the same clip at the same phase as the parts do.
+            foreach (var every in GetComponentsInChildren<Animation>(true))
+            {
+                if (!_animations.Contains(every))
+                {
+                    _animations.Add(every);
+                }
+            }
 
             if (Held)
             {

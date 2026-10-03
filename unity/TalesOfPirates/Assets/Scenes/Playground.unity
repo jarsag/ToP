@@ -861,7 +861,7 @@ MonoBehaviour:
   _body:
   - models/character/0003000000.glb
   _class: 3
-  _warRun: 0003_61
+  _warRun: 0003_60
   _warWait: 0003_04_waiting2
   _idle: 0003_01_waiting
   _move: 0003_05_run
