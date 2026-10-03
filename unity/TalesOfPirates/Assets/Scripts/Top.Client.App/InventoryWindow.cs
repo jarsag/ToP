@@ -526,7 +526,70 @@ namespace Top.Client.App
         {
             await System.Threading.Tasks.Task.Delay(2000);
 
+            // The bag is filled the moment the window is built, and the inventory may not
+            // have had its say by then - which is why a thing added to it turned up in the bag
+            // on some runs and not on others. Whatever is owned, is not already in the bag and
+            // is not being worn is taken in now.
+            Include();
+
             Snapshot("two seconds after the start");
+        }
+
+        /// <summary>Takes in anything the inventory owns that the bag is not showing yet.</summary>
+        private void Include()
+        {
+            if (_inventory == null)
+            {
+                return;
+            }
+
+            var took = 0;
+
+            foreach (var id in _inventory.Owned)
+            {
+                if (id == 0 || Held(id) || WornNow(id))
+                {
+                    continue;
+                }
+
+                Store(id);
+                took++;
+            }
+
+            if (took > 0)
+            {
+                Redraw();
+
+                Said($"took in {took} item(s) the bag was not showing");
+            }
+        }
+
+        /// <summary>Whether a cell of the bag already holds this item.</summary>
+        private bool Held(int id)
+        {
+            for (var i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i] == id)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>Whether the hero is wearing this, in which case it is not in the bag.</summary>
+        private bool WornNow(int id)
+        {
+            for (var slot = 1; slot <= 6; slot++)
+            {
+                if (_inventory.Equipped(slot) == id)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>Empties the cell an item stands in, which is what putting it on does.</summary>
