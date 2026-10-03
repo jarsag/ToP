@@ -345,6 +345,10 @@ namespace Top.Client.App
             var holder = new GameObject($"Carried {path}");
 
             holder.transform.SetParent(mount, worldPositionStays: false);
+
+            // Which mount it hangs on is not settled once: a weapon is in the hand out of a
+            // safe zone and on the back inside one, and the thing watches for that itself.
+            holder.AddComponent<CarriedItem>().Belong(slot, _carryRotation, _carryScale);
             holder.transform.localRotation = Quaternion.Euler(_carryRotation);
             holder.transform.localScale = Vector3.one * _carryScale;
 
