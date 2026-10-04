@@ -12,6 +12,14 @@ Shader "Top/Glow"
         // dark figures in it gives light in the form of them and nothing in the dark.
         _Cutoff("Cutoff", Range(0, 1)) = 0
 
+        // How the sheet is laid over the item: how big it is, and where it starts. In the item's own
+        // space rather than the item's texture coordinates, so that the sheet lies the same way over
+        // every part of a model - an item built from parts whose texture coordinates are turned
+        // against each other would otherwise wear the sheet one way on one part and across it on the
+        // next.
+        _GlowScale("Glow Scale", Vector) = (1, 1, 1, 1)
+        _GlowOffset("Glow Offset", Vector) = (0, 0, 0, 0)
+
         _Cull("Cull", Float) = 2
     }
 
@@ -51,6 +59,8 @@ Shader "Top/Glow"
                 half4 _GlowColour;
                 half _Opacity;
                 half _Cutoff;
+                float4 _GlowScale;
+                float4 _GlowOffset;
             CBUFFER_END
 
             struct Attributes
@@ -63,6 +73,7 @@ Shader "Top/Glow"
             {
                 float4 positionCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                float3 positionOS : TEXCOORD1;
             };
 
             Varyings Vert(Attributes input)
@@ -71,15 +82,21 @@ Shader "Top/Glow"
 
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv * _BaseMap_ST.xy + _BaseMap_ST.zw;
+                output.positionOS = input.positionOS.xyz;
 
                 return output;
             }
 
             half4 Frag(Varyings input) : SV_Target
             {
-                // How much light there is here at all, from the sheet's own brightness and its alpha
-                // together, so that either a white sheet or a masked one gives a shape.
-                half4 sheet = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
+                // The item's own space, not its texture coordinates. An item built from parts whose
+                // texture coordinates are turned against each other - which is how the client's own
+                // shapes are built - would wear a sheet one way on one part and across it on the next,
+                // and a sheet is a picture of light rather than a skin: it should lie the same way over
+                // the whole of what it lights.
+                float2 at = (input.positionOS.xz * _GlowScale.xy) + _GlowOffset.xy;
+
+                half4 sheet = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, at);
                 half shape = max(sheet.r, max(sheet.g, sheet.b)) * sheet.a;
 
                 // Left out rather than added where the sheet is too dark: a sheet with dark figures in

@@ -332,7 +332,7 @@ namespace Top.Client.App
         /// shifted. A sheet and an item are each of a size of their own, so how much of the sheet ends
         /// up on the item is a matter of taste.
         /// </summary>
-        [SerializeField] private Vector2 _glowTiling = Vector2.one;
+        [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 4f);
 
         [SerializeField] private Vector2 _glowOffset = Vector2.zero;
 

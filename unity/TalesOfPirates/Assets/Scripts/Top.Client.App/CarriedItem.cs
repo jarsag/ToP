@@ -46,7 +46,7 @@ namespace Top.Client.App
         /// A sheet of one's own comes at a size of its own, and an item of a size of its own as well -
         /// so how much of the sheet ends up on the item is a matter of taste rather than of arithmetic.
         /// </summary>
-        [SerializeField] private Vector2 _glowTiling = Vector2.one;
+        [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 4f);
 
         [SerializeField] private Vector2 _glowOffset = Vector2.zero;
 
@@ -104,6 +104,10 @@ namespace Top.Client.App
         private const string Strength = "_Opacity";
 
         private const string Cutoff = "_Cutoff";
+
+        private const string Scale = "_GlowScale";
+
+        private const string Shift = "_GlowOffset";
 
         /// <summary>The property a shader of the engine's own calls its colour.</summary>
         private const string Legacy = "_Color";
@@ -303,8 +307,7 @@ namespace Top.Client.App
                 // And the sheet drifts, so that the figure in it moves over the item rather than
                 // sitting on it. Wound round so the numbers stay small: a sheet is one tile across,
                 // and how many times it has gone round is nothing anyone can see.
-                layer.SetTextureScale(Sheet, _tiling);
-                layer.SetTextureOffset(Sheet, new Vector2(
+                Place(layer, new Vector2(
                     Mathf.Repeat(_offset.x + (_clock * _speed.x), 1f),
                     Mathf.Repeat(_offset.y + (_clock * _speed.y), 1f)));
             }
@@ -424,13 +427,32 @@ namespace Top.Client.App
             if (sheet != null)
             {
                 made.SetTexture(Sheet, sheet);
-                made.SetTextureScale(Sheet, _tiling);
-                made.SetTextureOffset(Sheet, _offset);
             }
 
+            Place(made, _offset);
             Paint(made, strength);
 
             return made;
+        }
+
+        /// <summary>
+        /// Says how the glow's sheet lies over the item: how big it is and where it starts, in the
+        /// item's own space rather than in its texture coordinates, so that the sheet lies the same way
+        /// over every part of a model built from pieces that are turned against each other.
+        /// </summary>
+        private void Place(Material made, Vector2 offset)
+        {
+            // The sheet is one tile across, so a scale of one puts a whole sheet over one unit of the
+            // item, whatever that unit is. In the item's own space the two axes are the item's own
+            // width and its own length - which is what makes a sheet lie along a blade rather than
+            // across it.
+            made.SetVector(Scale, new Vector4(
+                _tiling.x <= 0f ? 1f : _tiling.x,
+                1f,
+                _tiling.y <= 0f ? 1f : _tiling.y,
+                0f));
+
+            made.SetVector(Shift, new Vector4(offset.x, offset.y, 0f, 0f));
         }
 
         /// <summary>Puts the colour on a glow material, whatever the shader calls its colour.</summary>
@@ -446,7 +468,7 @@ namespace Top.Client.App
             // the sheet of that colour; ours takes the colour itself.
             var sheet = Light(_lit);
 
-            if (sheet != null)
+            if (sheet != null && made.HasProperty(Sheet))
             {
                 made.SetTexture(Sheet, sheet);
             }
