@@ -31,12 +31,14 @@ namespace Top.Client.App
             Green,
         }
 
+        /// <summary>
+        /// The colour to glow when nothing says otherwise - which is the case for a thing carried on its
+        /// own, with no hero to ask. A thing the hero carries takes its colour from him instead, so that
+        /// changing the setting changes what is already in his hand.
+        /// </summary>
         [SerializeField] private GlowColour _glow = GlowColour.None;
 
-        // How strongly the glow is laid on. An item's own glow is drawn at the strength its tier asks
-        // for rather than full, so that a faint forge does not read as a bright one.
         [SerializeField] private float _glowStrength = 1f;
-
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
 
@@ -68,6 +70,17 @@ namespace Top.Client.App
             _hung = false;
         }
 
+        /// <summary>
+        /// Tells it what colour to glow and how hard, when nothing else does. The hero's own settings
+        /// are asked for instead whenever there is a hero, so this is only what a thing carried by
+        /// nothing wears.
+        /// </summary>
+        public void Glow(GlowColour colour, float strength)
+        {
+            _glow = colour;
+            _glowStrength = strength;
+        }
+
         private void LateUpdate()
         {
             var safe = Zone.IsSafe(transform.root.position);
@@ -85,13 +98,16 @@ namespace Top.Client.App
             }
 
             // The way it sits is read every frame rather than once: the angles are tuned in the
-            // inspector while the game runs, and a weapon that ignored a change until the next
-            // time it was put on would be a weapon nobody could line up. And the glow, for the same
-            // reason: its colour is picked in the inspector while the game runs, and a glow that only
-            // changed when the weapon changed hands would be one nobody could try out.
+            // inspector while the game runs, and a weapon that ignored a change until the next time it
+            // was put on would be a weapon nobody could line up.
             Dress(safe);
 
-            Colour(_glow != _lit || !Mathf.Approximately(_strength, _glowStrength));
+            // The glow too, for the same reason. The colour belongs to the hero's settings and is not
+            // held here, so a colour picked while the game runs arrives on the next frame.
+            var colour = _hero != null ? _hero.GlowColour : GlowColour.None;
+            var strength = _hero != null ? _hero.GlowStrength : 1f;
+
+            Colour(colour != _lit || !Mathf.Approximately(_strength, strength), colour, strength);
         }
 
         /// <summary>
@@ -100,22 +116,22 @@ namespace Top.Client.App
         /// material and a layer taken away would shift the ones behind it onto the wrong triangles. A
         /// glow that is off is drawn nowhere, the layer's own art being a full sheet of colour.
         /// </summary>
-        private void Colour(bool changed)
+        private void Colour(bool changed, GlowColour colour, float strength)
         {
             if (!changed)
             {
                 return;
             }
 
-            _lit = _glow;
-            _strength = _glowStrength;
+            _lit = colour;
+            _strength = strength;
 
             var skin = GetComponentInChildren<MeshRenderer>();
             var worn = skin == null ? null : skin.sharedMaterials;
 
             if (worn == null || worn.Length <= GlowLayer)
             {
-                if (_glow != GlowColour.None)
+                if (colour != GlowColour.None)
                 {
                     Log.Info($"{name} has no glow layer to colour");
                 }
@@ -123,9 +139,9 @@ namespace Top.Client.App
                 return;
             }
 
-            worn[GlowLayer] = _glow == GlowColour.None
+            worn[GlowLayer] = colour == GlowColour.None
                 ? Material(null, 0f)
-                : Material(Resources.Load<Texture2D>($"Effect/glow_{_glow.ToString().ToLowerInvariant()}"), _glowStrength);
+                : Material(Resources.Load<Texture2D>($"Effect/glow_{colour.ToString().ToLowerInvariant()}"), strength);
 
             skin.sharedMaterials = worn;
         }

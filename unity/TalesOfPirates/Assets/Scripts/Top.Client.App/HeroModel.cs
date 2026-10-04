@@ -314,6 +314,28 @@ namespace Top.Client.App
 
         [SerializeField] private float _carryScale = 1f;
 
+        /// <summary>
+        /// Which colour the carried thing's own glow is, out of the four the client's items carry.
+        /// <br/>
+        /// A glowing item is two models laid over each other rather than one - its own material, and a
+        /// second additive one across the same triangles - and the glow is that second layer, given a
+        /// colour's texture rather than modelled. A model with a single material has no such layer and
+        /// does not glow, whatever is picked here.
+        /// </summary>
+        [SerializeField] private CarriedItem.GlowColour _glow = CarriedItem.GlowColour.None;
+
+        /// <summary>How hard the glow is laid on, the client drawing one at the strength its tier asks.</summary>
+        [SerializeField] private float _glowStrength = 1f;
+
+        /// <summary>
+        /// The glow colour a carried thing should wear, and how hard. Read by the thing itself, which
+        /// is made at runtime and has no other way back to these settings - and read every frame, so a
+        /// colour picked in the inspector while the game runs is picked up on the next one.
+        /// </summary>
+        public CarriedItem.GlowColour GlowColour => _glow;
+
+        public float GlowStrength => _glowStrength;
+
 
         /// <summary>How a carried thing sits in a hand, for whatever is hanging on one.</summary>
         public Vector3 HandRotation => _carryRotation;
