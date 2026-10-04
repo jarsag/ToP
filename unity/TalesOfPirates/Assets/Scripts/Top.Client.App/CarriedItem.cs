@@ -77,6 +77,9 @@ namespace Top.Client.App
         /// <summary>The clock the glow breathes on, which belongs to the scene rather than to this thing.</summary>
         private float _clock;
 
+        /// <summary>The soft spot a glow layer made here is drawn with, made once and shared.</summary>
+        private static Texture2D _bloom;
+
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
         {
@@ -284,21 +287,62 @@ namespace Top.Client.App
 
             shape.sharedMesh = filter.sharedMesh;
 
-            // The layer wears the item's own art. A material with no texture draws white under an
-            // additive shader whatever colour is asked of it, and a tint over white is nearly white -
-            // so the art the item already has is what the colour is laid on.
-            var art = skin != null ? skin.sharedMaterial : null;
-
-            made.sharedMaterial = Material(
-                GlowColour.None,
-                0f,
-                art != null ? art.mainTexture : null);
+            made.sharedMaterial = Material(GlowColour.None, 0f, Bloom());
 
             made.enabled = false;
 
             _shell = made;
 
             return _shell;
+        }
+
+        /// <summary>
+        /// The art a glow layer made here wears: a soft round spot, brightest at its middle and fading
+        /// to nothing at its edge. <br/>
+        /// It is made in code rather than carried as a file, being twelve lines of arithmetic and no
+        /// picture at all. The item's own art will not do - laid over itself additively it only makes
+        /// the item brighter, an item has no empty space in it for a colour to show through, and the
+        /// whole of what is wanted is a colour where the item is and none where it is not.
+        /// </summary>
+        private static Texture2D Bloom()
+        {
+            if (_bloom != null)
+            {
+                return _bloom;
+            }
+
+            const int size = 64;
+
+            _bloom = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "glow bloom",
+                wrapMode = TextureWrapMode.Clamp,
+            };
+
+            var pixels = new Color32[size * size];
+
+            for (var y = 0; y < size; y++)
+            {
+                for (var x = 0; x < size; x++)
+                {
+                    var dx = x / (size - 1f) * 2f - 1f;
+                    var dy = y / (size - 1f) * 2f - 1f;
+
+                    // Full at the middle, nothing at the edge, and smoothed so that the fall-off has
+                    // no rim to it.
+                    var away = Mathf.Sqrt((dx * dx) + (dy * dy));
+                    var light = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(away));
+
+                    var value = (byte)(Mathf.Clamp01(light) * 255f);
+
+                    pixels[(y * size) + x] = new Color32(255, 255, 255, value);
+                }
+            }
+
+            _bloom.SetPixels32(pixels);
+            _bloom.Apply();
+
+            return _bloom;
         }
 
         /// <summary>
