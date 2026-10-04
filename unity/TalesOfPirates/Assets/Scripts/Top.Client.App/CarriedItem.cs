@@ -45,8 +45,11 @@ namespace Top.Client.App
         /// far it is shifted. <br/>
         /// A sheet of one's own comes at a size of its own, and an item of a size of its own as well -
         /// so how much of the sheet ends up on the item is a matter of taste rather than of arithmetic.
+        /// The default is the shape of a blade: one unit across and two and a bit along, which is what
+        /// the client's own sword measures - a sheet keeping its own proportions over it is a picture
+        /// rather than a smear.
         /// </summary>
-        [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 4f);
+        [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 2.2f);
 
         [SerializeField] private Vector2 _glowOffset = Vector2.zero;
 
