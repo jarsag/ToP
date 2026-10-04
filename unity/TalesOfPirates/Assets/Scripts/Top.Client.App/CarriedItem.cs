@@ -40,6 +40,16 @@ namespace Top.Client.App
 
         [SerializeField] private float _glowStrength = 1f;
 
+        /// <summary>
+        /// How a glow layer made here lays its sheet over the item: how many times it repeats, and how
+        /// far it is shifted. <br/>
+        /// A sheet of one's own comes at a size of its own, and an item of a size of its own as well -
+        /// so how much of the sheet ends up on the item is a matter of taste rather than of arithmetic.
+        /// </summary>
+        [SerializeField] private Vector2 _glowTiling = Vector2.one;
+
+        [SerializeField] private Vector2 _glowOffset = Vector2.zero;
+
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
 
@@ -86,6 +96,11 @@ namespace Top.Client.App
         /// <summary>The white spot a glow layer made here is drawn with, made once and shared.</summary>
         private static Texture2D _shape;
 
+        /// <summary>How the sheet of a glow layer made here is laid over the item, from the settings.</summary>
+        private static Vector2 _tiling = Vector2.one;
+
+        private static Vector2 _offset = Vector2.zero;
+
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
         {
@@ -131,10 +146,16 @@ namespace Top.Client.App
             // was put on would be a weapon nobody could line up.
             Dress(safe);
 
-            // The glow too, for the same reason. The colour and its strength belong to the hero's
-            // settings and are not held here, so anything picked while the game runs arrives next frame.
+            // The glow too, for the same reason. The colour, its strength and how its sheet is laid
+            // are the hero's settings and are not held here, so anything picked while the game runs
+            // arrives next frame.
             var colour = _hero != null ? _hero.GlowColour : _glow;
             var strength = _hero != null ? _hero.GlowStrength : _glowStrength;
+            var tiling = _hero != null ? _hero.GlowTiling : _glowTiling;
+            var offset = _hero != null ? _hero.GlowOffset : _glowOffset;
+
+            _tiling = tiling;
+            _offset = offset;
 
             Colour(!Mathf.Approximately(_strength, strength) || colour != _lit, colour, strength);
         }
@@ -298,15 +319,22 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// The art a glow layer made here wears, which is the client's own: one soft sheet of a single
-        /// colour per colour, taken from the item texture folder beside the effects. <br/>
-        /// A sheet of one colour is the whole of what a glow needs to be drawn with - the colour is in
-        /// the picture and the alpha is how far it reaches - and the item's own art will not do, because
-        /// laid over itself additively it only makes the item brighter. An item has no empty space in
-        /// it, so there is nowhere for a colour to show through.
+        /// The art a glow layer made here wears. <br/>
+        /// A sheet of one's own comes first, when there is one: it is the shape of the light, and a
+        /// shape someone chose is better than any of ours. Failing that the client's own sheet for the
+        /// colour is used, which is a soft spot already drawn in that colour, and failing that a soft
+        /// white spot made in code. A white sheet is what the colour setting is for - it takes any - so
+        /// a grey or white sheet of one's own is the one to put here.
         /// </summary>
         private static Texture Light(GlowColour colour)
         {
+            var chosen = Resources.Load<Texture2D>("Effect/glow_custom");
+
+            if (chosen != null)
+            {
+                return chosen;
+            }
+
             return colour == GlowColour.None
                 ? null
                 : Resources.Load<Texture2D>($"Effect/glow_{colour.ToString().ToLowerInvariant()}");
@@ -346,6 +374,8 @@ namespace Top.Client.App
             }
 
             made.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
+            made.mainTextureScale = _tiling;
+            made.mainTextureOffset = _offset;
 
             return made;
         }

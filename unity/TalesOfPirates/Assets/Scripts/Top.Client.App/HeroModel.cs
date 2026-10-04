@@ -328,13 +328,27 @@ namespace Top.Client.App
         [SerializeField] private float _glowStrength = 1f;
 
         /// <summary>
-        /// The glow colour a carried thing should wear, and how hard. Read by the thing itself, which is
-        /// made at runtime and has no other way back to these settings - and read every frame, so a
-        /// colour picked in the inspector while the game runs is picked up on the next one.
+        /// How the glow's sheet is laid over the item: how many times it repeats and how far it is
+        /// shifted. A sheet and an item are each of a size of their own, so how much of the sheet ends
+        /// up on the item is a matter of taste.
+        /// </summary>
+        [SerializeField] private Vector2 _glowTiling = Vector2.one;
+
+        [SerializeField] private Vector2 _glowOffset = Vector2.zero;
+
+        /// <summary>
+        /// The glow a carried thing should wear: its colour, how hard it is laid on, and how its sheet
+        /// is laid over the item. Read by the thing itself, which is made at runtime and has no other
+        /// way back to these settings - and read every frame, so a colour picked in the inspector while
+        /// the game runs is picked up on the next one.
         /// </summary>
         public CarriedItem.GlowColour GlowColour => _glow;
 
         public float GlowStrength => _glowStrength;
+
+        public Vector2 GlowTiling => _glowTiling;
+
+        public Vector2 GlowOffset => _glowOffset;
 
 
         /// <summary>How a carried thing sits in a hand, for whatever is hanging on one.</summary>
