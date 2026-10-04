@@ -14,6 +14,29 @@ namespace Top.Client.App
     /// </summary>
     public class CarriedItem : MonoBehaviour
     {
+        /// <summary>
+        /// Which colour the thing's own glow is, out of the four the client's items carry: a red, a
+        /// blue, a yellow and a green. <br/>
+        /// A glowing item is not one model but two laid over each other - the item's own material, and a
+        /// second additive one stretched across the same triangles - and it is that second one the glow
+        /// is: the client gives it this colour's texture rather than modelling the light. A model with a
+        /// single material has no such layer and does not glow, whatever is chosen here.
+        /// </summary>
+        public enum GlowColour
+        {
+            None,
+            Red,
+            Blue,
+            Yellow,
+            Green,
+        }
+
+        [SerializeField] private GlowColour _glow = GlowColour.None;
+
+        // How strongly the glow is laid on. An item's own glow is drawn at the strength its tier asks
+        // for rather than full, so that a faint forge does not read as a bright one.
+        [SerializeField] private float _glowStrength = 1f;
+
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
 
@@ -29,6 +52,13 @@ namespace Top.Client.App
         private bool _safe;
 
         private bool _hung;
+
+        private GlowColour _lit;
+
+        private float _strength = -1f;
+
+        /// <summary>The layer the glow is drawn on: the second material of a model that has one.</summary>
+        private const int GlowLayer = 1;
 
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
@@ -56,8 +86,79 @@ namespace Top.Client.App
 
             // The way it sits is read every frame rather than once: the angles are tuned in the
             // inspector while the game runs, and a weapon that ignored a change until the next
-            // time it was put on would be a weapon nobody could line up.
+            // time it was put on would be a weapon nobody could line up. And the glow, for the same
+            // reason: its colour is picked in the inspector while the game runs, and a glow that only
+            // changed when the weapon changed hands would be one nobody could try out.
             Dress(safe);
+
+            Colour(_glow != _lit || !Mathf.Approximately(_strength, _glowStrength));
+        }
+
+        /// <summary>
+        /// Lays the chosen colour over the thing's own glow layer, if it has one. <br/>
+        /// The layer keeps the place its own material had, because a renderer draws one layer per
+        /// material and a layer taken away would shift the ones behind it onto the wrong triangles. A
+        /// glow that is off is drawn nowhere, the layer's own art being a full sheet of colour.
+        /// </summary>
+        private void Colour(bool changed)
+        {
+            if (!changed)
+            {
+                return;
+            }
+
+            _lit = _glow;
+            _strength = _glowStrength;
+
+            var skin = GetComponentInChildren<MeshRenderer>();
+            var worn = skin == null ? null : skin.sharedMaterials;
+
+            if (worn == null || worn.Length <= GlowLayer)
+            {
+                if (_glow != GlowColour.None)
+                {
+                    Log.Info($"{name} has no glow layer to colour");
+                }
+
+                return;
+            }
+
+            worn[GlowLayer] = _glow == GlowColour.None
+                ? Material(null, 0f)
+                : Material(Resources.Load<Texture2D>($"Effect/glow_{_glow.ToString().ToLowerInvariant()}"), _glowStrength);
+
+            skin.sharedMaterials = worn;
+        }
+
+        /// <summary>
+        /// An additive material for a glow layer. <br/>
+        /// The client's glow is a second pass over the same triangles rather than anything modelled, so
+        /// it is drawn additively - the light is added to what is under it rather than replacing it.
+        /// </summary>
+        private static Material Material(Texture2D texture, float strength)
+        {
+            var shader = Shader.Find("Legacy Shaders/Particles/Additive");
+
+            if (shader == null)
+            {
+                shader = Shader.Find("Particles/Additive");
+            }
+
+            if (shader == null)
+            {
+                shader = Shader.Find("Sprites/Default");
+            }
+
+            var made = new Material(shader);
+
+            if (texture != null)
+            {
+                made.mainTexture = texture;
+            }
+
+            made.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
+
+            return made;
         }
 
         /// <summary>Puts the thing the way the hero says it should look, in hand or on back.</summary>
