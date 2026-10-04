@@ -57,6 +57,12 @@ namespace Top.Client.App
         /// </summary>
         [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
 
+        /// <summary>
+        /// Everything darker than this on the glow's sheet is left out rather than added. A sheet with
+        /// dark figures in it would otherwise lift the whole item faintly instead of lighting them.
+        /// </summary>
+        [SerializeField] private float _glowCutoff;
+
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
 
@@ -86,6 +92,22 @@ namespace Top.Client.App
         /// <summary>The layer the glow is drawn on: the second material of a model that has one.</summary>
         private const int GlowLayer = 1;
 
+        /// <summary>
+        /// What the glow shader calls its properties. Set by name rather than by a renderer's shorthand,
+        /// which reaches only a property called <c>_Color</c> - a colour of one's own under any other
+        /// name being missed by it, silently.
+        /// </summary>
+        private const string Sheet = "_BaseMap";
+
+        private const string Tint = "_GlowColour";
+
+        private const string Strength = "_Opacity";
+
+        private const string Cutoff = "_Cutoff";
+
+        /// <summary>The property a shader of the engine's own calls its colour.</summary>
+        private const string Legacy = "_Color";
+
         /// <summary>How long one breath of the glow takes, and how far down it breathes.</summary>
         private const float BreathSeconds = 2.4f;
 
@@ -112,6 +134,8 @@ namespace Top.Client.App
         private Vector2 _offset = Vector2.zero;
 
         private Vector2 _speed = new Vector2(0.02f, 0.01f);
+
+        private float _edge;
 
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
@@ -166,10 +190,12 @@ namespace Top.Client.App
             var tiling = _hero != null ? _hero.GlowTiling : _glowTiling;
             var offset = _hero != null ? _hero.GlowOffset : _glowOffset;
             var speed = _hero != null ? _hero.GlowDrift : _glowDrift;
+            var edge = _hero != null ? _hero.GlowCutoff : _glowCutoff;
 
             _tiling = tiling;
             _offset = offset;
             _speed = speed;
+            _edge = edge;
 
             Colour(!Mathf.Approximately(_strength, strength) || colour != _lit, colour, strength);
         }
@@ -272,15 +298,15 @@ namespace Top.Client.App
 
             if (layer != null)
             {
-                layer.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
+                Paint(layer, strength);
 
                 // And the sheet drifts, so that the figure in it moves over the item rather than
                 // sitting on it. Wound round so the numbers stay small: a sheet is one tile across,
                 // and how many times it has gone round is nothing anyone can see.
-                layer.mainTextureScale = _tiling;
-                layer.mainTextureOffset = new Vector2(
+                layer.SetTextureScale(Sheet, _tiling);
+                layer.SetTextureOffset(Sheet, new Vector2(
                     Mathf.Repeat(_offset.x + (_clock * _speed.x), 1f),
-                    Mathf.Repeat(_offset.y + (_clock * _speed.y), 1f));
+                    Mathf.Repeat(_offset.y + (_clock * _speed.y), 1f)));
             }
         }
 
@@ -376,6 +402,11 @@ namespace Top.Client.App
         /// adds - and it takes the shape of the light from its sheet while the colour comes from the
         /// material. The client's own sheet for this colour is used as that shape, being a soft spot of
         /// the right size; a sheet of one's own can be put there instead.
+        /// <br/>
+        /// The shader's properties are set by name. A renderer's shorthand for a material's colour is
+        /// the property called <c>_Color</c>, and a shader with a colour of its own under another name
+        /// is not reached by it - which is a setting that takes effect everywhere except where it is
+        /// wanted.
         /// </summary>
         private Material Material(GlowColour colour, float strength)
         {
@@ -392,14 +423,66 @@ namespace Top.Client.App
 
             if (sheet != null)
             {
-                made.mainTexture = sheet;
+                made.SetTexture(Sheet, sheet);
+                made.SetTextureScale(Sheet, _tiling);
+                made.SetTextureOffset(Sheet, _offset);
             }
 
-            made.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
-            made.mainTextureScale = _tiling;
-            made.mainTextureOffset = _offset;
+            Paint(made, strength);
 
             return made;
+        }
+
+        /// <summary>Puts the colour on a glow material, whatever the shader calls its colour.</summary>
+        private void Paint(Material made, float strength)
+        {
+            var tint = Tone(_lit, strength);
+
+            made.SetColor(Tint, tint);
+            made.SetColor(Legacy, Color.white);
+            made.SetFloat(Cutoff, _edge);
+
+            // On the engine's own additive shader the colour is the picture's, so what is put there is
+            // the sheet of that colour; ours takes the colour itself.
+            var sheet = Light(_lit);
+
+            if (sheet != null)
+            {
+                made.SetTexture(Sheet, sheet);
+            }
+
+            made.SetFloat(Strength, 1f);
+        }
+
+        /// <summary>
+        /// The colour a glow of this kind is, with how hard it is laid on in its alpha.
+        /// <br/>
+        /// The four are the ones the client's items carry. They are set here rather than taken from the
+        /// client's sheets because a sheet's colour cannot be changed: the shader multiplies, so a sheet
+        /// drawn in red stays red whatever is asked for, and a sheet drawn in grey takes any colour -
+        /// which is what a sheet of one's own is for.
+        /// </summary>
+        private static Color Tone(GlowColour colour, float strength)
+        {
+            var alpha = Mathf.Clamp01(strength);
+
+            switch (colour)
+            {
+                case GlowColour.Red:
+                    return new Color(1f, 0.3f, 0.2f, alpha);
+
+                case GlowColour.Blue:
+                    return new Color(0.4f, 0.6f, 1f, alpha);
+
+                case GlowColour.Yellow:
+                    return new Color(1f, 0.88f, 0.45f, alpha);
+
+                case GlowColour.Green:
+                    return new Color(0.5f, 1f, 0.55f, alpha);
+
+                default:
+                    return new Color(1f, 1f, 1f, 0f);
+            }
         }
 
         /// <summary>

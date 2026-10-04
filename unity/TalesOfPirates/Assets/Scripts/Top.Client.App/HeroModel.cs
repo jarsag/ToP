@@ -344,6 +344,12 @@ namespace Top.Client.App
         [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
 
         /// <summary>
+        /// Everything darker than this on the glow's sheet is left out rather than added, so that a
+        /// sheet with dark figures in it lights the figures instead of lifting the whole item faintly.
+        /// </summary>
+        [SerializeField] private float _glowCutoff;
+
+        /// <summary>
         /// The glow a carried thing should wear: its colour, how hard it is laid on, and how its sheet
         /// is laid over the item. Read by the thing itself, which is made at runtime and has no other
         /// way back to these settings - and read every frame, so a colour picked in the inspector while
@@ -358,6 +364,8 @@ namespace Top.Client.App
         public Vector2 GlowOffset => _glowOffset;
 
         public Vector2 GlowDrift => _glowDrift;
+
+        public float GlowCutoff => _glowCutoff;
 
 
         /// <summary>How a carried thing sits in a hand, for whatever is hanging on one.</summary>

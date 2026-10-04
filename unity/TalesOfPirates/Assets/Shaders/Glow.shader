@@ -7,6 +7,11 @@ Shader "Top/Glow"
         [MainTexture] _BaseMap("Glow Map", 2D) = "white" {}
         [HDR] _GlowColour("Glow Colour", Color) = (1, 1, 1, 1)
         _Opacity("Opacity", Range(0, 1)) = 1
+
+        // Everything darker than this on the sheet is left out rather than added, so that a sheet with
+        // dark figures in it gives light in the form of them and nothing in the dark.
+        _Cutoff("Cutoff", Range(0, 1)) = 0
+
         _Cull("Cull", Float) = 2
     }
 
@@ -45,6 +50,7 @@ Shader "Top/Glow"
                 float4 _BaseMap_ST;
                 half4 _GlowColour;
                 half _Opacity;
+                half _Cutoff;
             CBUFFER_END
 
             struct Attributes
@@ -75,6 +81,10 @@ Shader "Top/Glow"
                 // together, so that either a white sheet or a masked one gives a shape.
                 half4 sheet = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
                 half shape = max(sheet.r, max(sheet.g, sheet.b)) * sheet.a;
+
+                // Left out rather than added where the sheet is too dark: a sheet with dark figures in
+                // it would otherwise lift the whole item faintly instead of lighting the figures.
+                clip(shape - _Cutoff);
 
                 // Strictly the material's colour, with the sheet deciding only how much of it there is.
                 // Multiplying the sheet's own colour in as well would make the glow the colour of a
