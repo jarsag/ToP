@@ -58,7 +58,7 @@ namespace Top.Client.App
         /// </summary>
         [SerializeField] private GlowColour _glow = GlowColour.None;
 
-        [Range(0f, 4f)] [SerializeField] private float _glowStrength = 1f;
+        [SerializeField] private float _glowStrength = 1f;
 
         /// <summary>
         /// How a glow layer made here lays its sheet over the item: how many times it repeats, and how
@@ -84,14 +84,14 @@ namespace Top.Client.App
         /// Everything darker than this on the glow's sheet is left out rather than added. A sheet with
         /// dark figures in it would otherwise lift the whole item faintly instead of lighting them.
         /// </summary>
-        [Range(0f, 1f)] [SerializeField] private float _glowCutoff;
+        [SerializeField] private float _glowCutoff;
 
         /// <summary>
         /// How far the glow's colour is from grey: nought leaves it grey, one is the colour as it
         /// stands, and past one it is pushed further. A glow too vivid for the item under it, or too
         /// pale to be seen on it, is a matter of this rather than of which colour was picked.
         /// </summary>
-        [Range(0f, 3f)] [SerializeField] private float _glowSaturation = 1f;
+        [SerializeField] private float _glowSaturation = 1f;
 
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;

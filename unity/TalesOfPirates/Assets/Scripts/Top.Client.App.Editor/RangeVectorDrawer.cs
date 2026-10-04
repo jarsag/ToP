@@ -5,16 +5,16 @@ using UnityEngine;
 namespace Top.Client.App.Editor
 {
     /// <summary>
-    /// Draws a pair of numbers as two sliders with a name each, where the plain field would be one box
-    /// of two numbers to be typed. <br/>
-    /// A pair like how many times a sheet repeats across an item and along it is a thing to feel for
-    /// rather than to work out, and a slider is how it is felt. The two are drawn side by side under one
-    /// label, because they are one setting with two sides rather than two settings.
+    /// Draws a pair of numbers as two named fields side by side, where the plain field would be one box
+    /// of two numbers whose meaning has to be remembered. <br/>
+    /// Numbers rather than sliders: a setting like how many times a sheet repeats is usually wanted at
+    /// some figure thought of rather than hunted for with a handle, and a slider makes a figure hard to
+    /// hit.
     /// </summary>
     [CustomPropertyDrawer(typeof(CarriedItem.RangeVectorAttribute))]
     public class RangeVectorDrawer : PropertyDrawer
     {
-        private const float Between = 2f;
+        private const float Between = 4f;
 
         public override void OnGUI(Rect at, SerializedProperty property, GUIContent label)
         {
@@ -25,27 +25,21 @@ namespace Top.Client.App.Editor
                 return;
             }
 
-            var setting = (CarriedItem.RangeVectorAttribute)attribute;
-            var names = setting.Names;
-            var height = (at.height - EditorGUIUtility.standardVerticalSpacing) * 0.5f;
-            var line = new Rect(at.x, at.y, at.width, height);
+            var names = ((CarriedItem.RangeVectorAttribute)attribute).Names;
+            var y = at.y + EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
-            EditorGUI.LabelField(line, label);
+            EditorGUI.LabelField(new Rect(at.x, at.y, at.width, EditorGUIUtility.singleLineHeight), label);
 
-            var below = new Rect(at.x, at.y + height + EditorGUIUtility.standardVerticalSpacing, at.width, height);
-            var gap = (below.width - Between) * 0.5f;
+            // The name takes the width of its own words, so that a long one does not crowd the field
+            // out; the two fields share what is left of the line between them.
+            var line = new Rect(at.x, y, at.width, EditorGUIUtility.singleLineHeight);
 
-            var left = new Rect(below.x, below.y, gap, below.height);
-            var right = new Rect(below.x + gap + Between, below.y, gap, below.height);
+            Named(line, names != null && names.Length > 0 ? names[0] : "X", property.FindPropertyRelative("x"));
 
-            var x = property.FindPropertyRelative("x");
-            var y = property.FindPropertyRelative("y");
+            var second = new Rect(at.x + (at.width * 0.5f) + Between, y, (at.width * 0.5f) - Between,
+                EditorGUIUtility.singleLineHeight);
 
-            x.floatValue = Named(left, names != null && names.Length > 0 ? names[0] : "X", x.floatValue,
-                setting.Min, setting.Max);
-
-            y.floatValue = Named(right, names != null && names.Length > 1 ? names[1] : "Y", y.floatValue,
-                setting.Min, setting.Max);
+            Named(second, names != null && names.Length > 1 ? names[1] : "Y", property.FindPropertyRelative("y"));
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -55,17 +49,14 @@ namespace Top.Client.App.Editor
                 : (EditorGUIUtility.singleLineHeight * 2f) + EditorGUIUtility.standardVerticalSpacing;
         }
 
-        private static float Named(Rect at, string name, float value, float min, float max)
+        private static void Named(Rect at, string name, SerializedProperty number)
         {
-            // The label is drawn separately so that it takes the width of its own words rather than a
-            // share of the line, which keeps a long name from crowding the slider out.
             var width = EditorStyles.label.CalcSize(new GUIContent(name)).x;
             var labelAt = new Rect(at.x, at.y, width, at.height);
-            var sliderAt = new Rect(at.x + width + 4f, at.y, at.width - width - 4f, at.height);
+            var fieldAt = new Rect(at.x + width + 4f, at.y, Mathf.Max(at.width - width - 4f, 4f), at.height);
 
             EditorGUI.LabelField(labelAt, name);
-
-            return EditorGUI.Slider(sliderAt, value, min, max);
+            number.floatValue = EditorGUI.FloatField(fieldAt, number.floatValue);
         }
     }
 }

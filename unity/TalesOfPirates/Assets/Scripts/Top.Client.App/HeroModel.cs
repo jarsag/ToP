@@ -325,7 +325,7 @@ namespace Top.Client.App
         [SerializeField] private CarriedItem.GlowColour _glow = CarriedItem.GlowColour.None;
 
         /// <summary>How hard the glow is laid on, the client drawing one at the strength its tier asks.</summary>
-        [Range(0f, 4f)] [SerializeField] private float _glowStrength = 1f;
+        [SerializeField] private float _glowStrength = 1f;
 
         /// <summary>
         /// How the glow's sheet is laid over the item: how many times it repeats and how far it is
@@ -347,13 +347,13 @@ namespace Top.Client.App
         /// Everything darker than this on the glow's sheet is left out rather than added, so that a
         /// sheet with dark figures in it lights the figures instead of lifting the whole item faintly.
         /// </summary>
-        [Range(0f, 1f)] [SerializeField] private float _glowCutoff;
+        [SerializeField] private float _glowCutoff;
 
         /// <summary>
         /// How far the glow's colour is from grey: nought leaves it grey, one is the colour as it
         /// stands, and past one it is pushed further.
         /// </summary>
-        [Range(0f, 3f)] [SerializeField] private float _glowSaturation = 1f;
+        [SerializeField] private float _glowSaturation = 1f;
 
         /// <summary>
         /// The glow a carried thing should wear: its colour, how hard it is laid on, and how its sheet
