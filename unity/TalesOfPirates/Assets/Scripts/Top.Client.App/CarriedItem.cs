@@ -83,6 +83,9 @@ namespace Top.Client.App
         /// </summary>
         private Material _glowBack;
 
+        /// <summary>The white spot a glow layer made here is drawn with, made once and shared.</summary>
+        private static Texture2D _shape;
+
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
         {
@@ -315,34 +318,83 @@ namespace Top.Client.App
         /// it is drawn additively - the light is added to what is under it rather than replacing it. The
         /// art is the item's own, and the colour is laid over it.
         /// </summary>
+        /// <summary>
+        /// An additive material for a glow layer made here, drawn by the project's own glow shader so
+        /// that the colour and the opacity are settings rather than something baked into a picture.
+        /// <br/>
+        /// The shader adds to what is under it rather than laying over it - a glow is light, and light
+        /// adds - and it takes the shape of the light from its sheet while the colour comes from the
+        /// material. The client's own sheet for this colour is used as that shape, being a soft spot of
+        /// the right size; a sheet of one's own can be put there instead.
+        /// </summary>
         private static Material Material(GlowColour colour, float strength)
         {
-            var shader = Shader.Find("Legacy Shaders/Particles/Additive");
+            var shader = Shader.Find("Top/Glow");
 
             if (shader == null)
             {
-                shader = Shader.Find("Particles/Additive");
-            }
-
-            if (shader == null)
-            {
-                shader = Shader.Find("Sprites/Default");
+                shader = Shader.Find("Legacy Shaders/Particles/Additive");
             }
 
             var made = new Material(shader);
 
-            var texture = Light(colour);
+            var sheet = Light(colour) ?? Shape();
 
-            if (texture != null)
+            if (sheet != null)
             {
-                made.mainTexture = texture;
+                made.mainTexture = sheet;
             }
 
-            // White, so that the colour is whatever the picture is: the client's glow art is already a
-            // sheet of the colour it wants, and tinting it as well would only dull it.
             made.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
 
             return made;
+        }
+
+        /// <summary>
+        /// The shape of the light a glow layer made here is drawn with: a soft white spot, brightest at
+        /// its middle and fading to nothing at its edge, made in code rather than carried as a file.
+        /// <br/>
+        /// White, so that the colour of the glow is the material's and nothing else - the client's own
+        /// glow sheet already carries a colour of its own, which is why it is preferred when there is
+        /// one. And round, being a light rather than a shape: what it is laid on is the item.
+        /// </summary>
+        private static Texture2D Shape()
+        {
+            if (_shape != null)
+            {
+                return _shape;
+            }
+
+            const int size = 256;
+
+            _shape = new Texture2D(size, size, TextureFormat.RGBA32, true)
+            {
+                name = "glow shape",
+                wrapMode = TextureWrapMode.Clamp,
+            };
+
+            var pixels = new Color32[size * size];
+
+            for (var y = 0; y < size; y++)
+            {
+                for (var x = 0; x < size; x++)
+                {
+                    var dx = ((x / (size - 1f)) * 2f) - 1f;
+                    var dy = ((y / (size - 1f)) * 2f) - 1f;
+                    var away = Mathf.Clamp01(Mathf.Sqrt((dx * dx) + (dy * dy)));
+
+                    // A flat core with a long fall-off, which is what makes it read as light rather
+                    // than as a pale disc.
+                    var light = 1f - Mathf.SmoothStep(0f, 1f, away);
+
+                    pixels[(y * size) + x] = new Color32(255, 255, 255, (byte)(Mathf.Clamp01(light) * 255f));
+                }
+            }
+
+            _shape.SetPixels32(pixels);
+            _shape.Apply(true);
+
+            return _shape;
         }
 
         /// <summary>Puts the thing the way the hero says it should look, in hand or on back.</summary>
