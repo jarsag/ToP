@@ -58,6 +58,16 @@ namespace Top.Client.App
             public float bottomRadius;
             public int rotationLoop;
             public float[] rotationLoopVector;
+
+            // The texture's own animation. An effect whose art is a few still pictures in one image
+            // animates by nothing else: an effect of type 3 carries several sets of coordinates into
+            // that one image and steps between them on a timer of its own, so the stills are windows
+            // onto the art rather than frames in a sequence. The sets arrive as one run of numbers
+            // with a stride, because the JSON a scene carries cannot hold a list of lists.
+            public int effectType;
+            public float textureFrameTime;
+            public float[] textureLists;
+            public int textureFrameStride;
         }
 
         [Serializable]
@@ -72,6 +82,11 @@ namespace Top.Client.App
         {
             public Transform Root;
             public float Start;
+
+            // The shapes of one particle, kept so the texture's own animation can be stepped into
+            // them without looking for them again every frame, and the window each is showing.
+            public MeshFilter[] Meshes;
+            public int[] Frames;
         }
 
         private readonly List<Particle> _particles = new List<Particle>();
@@ -190,15 +205,25 @@ namespace Top.Client.App
 
             root.SetParent(_holder, worldPositionStays: false);
 
+            var meshes = new List<MeshFilter>();
+            var frames = new List<int>();
+
             foreach (var emitter in _sheet.emitters)
             {
-                Shape(emitter, root);
+                meshes.Add(Shape(emitter, root));
+                frames.Add(-1);
             }
 
-            _particles.Add(new Particle { Root = root, Start = Time.time });
+            _particles.Add(new Particle
+            {
+                Root = root,
+                Start = Time.time,
+                Meshes = meshes.ToArray(),
+                Frames = frames.ToArray(),
+            });
         }
 
-        private void Shape(Emitter emitter, Transform root)
+        private MeshFilter Shape(Emitter emitter, Transform root)
         {
             var shape = new GameObject($"{emitter.model} ({emitter.texture})");
 
@@ -218,6 +243,90 @@ namespace Top.Client.App
             shape.transform.localScale = size * _scale;
 
             skin.material = Material(Resources.Load<Texture2D>($"Effect/{emitter.texture}"));
+
+            return filter;
+        }
+
+        /// <summary>
+        /// The window onto the texture an effect of type 3 is showing at a moment, worked out the way
+        /// the client's CTexFrame works it out: a set of coordinates is held for one frame's worth of
+        /// time and the next is stepped to at the end of it, round and round. <br/>
+        /// This is the whole of the animation for an effect whose art is a handful of still pictures in
+        /// one image - no movement is stored in the file at all, only a different window onto the same
+        /// texture, which is why such an effect looks like so many sprites until it is set going.
+        /// </summary>
+        private static int TextureFrame(Emitter emitter, float age)
+        {
+            var stride = emitter.textureFrameStride;
+
+            if (emitter.effectType != 3 || emitter.textureLists == null || stride <= 0
+                || emitter.textureLists.Length < stride * 2 || emitter.textureFrameTime <= 0f)
+            {
+                return 0;
+            }
+
+            var sets = emitter.textureLists.Length / stride;
+
+            if (age <= 0f)
+            {
+                return 0;
+            }
+
+            var at = Mathf.Max(Mathf.CeilToInt(age / emitter.textureFrameTime) - 1, 0);
+
+            return at % sets;
+        }
+
+        /// <summary>
+        /// Steps every shape of a particle onto the window its texture has reached, if it has moved.
+        /// <br/>
+        /// The coordinates go in as they are. A shape's own corners are turned over when it is built,
+        /// because the client numbers a texture from the top down and a renderer from the bottom up -
+        /// but these coordinates are written for a renderer already, so turning them over as well is a
+        /// second flip on top of the first: on a two by two atlas it swaps the top pair of windows with
+        /// the bottom pair, and the effect is seen through the wrong half of its own art.
+        /// </summary>
+        private void Animate(Particle particle, float age)
+        {
+            for (var i = 0; i < particle.Meshes.Length && i < _sheet.emitters.Length; i++)
+            {
+                var filter = particle.Meshes[i];
+                var emitter = _sheet.emitters[i];
+
+                if (filter == null || filter.sharedMesh == null)
+                {
+                    continue;
+                }
+
+                var frame = TextureFrame(emitter, age);
+
+                if (particle.Frames[i] == frame)
+                {
+                    continue;
+                }
+
+                var stride = emitter.textureFrameStride;
+                var vertices = filter.sharedMesh.vertexCount;
+
+                if (emitter.textureLists == null || stride < vertices * 2)
+                {
+                    continue;
+                }
+
+                var uvs = new Vector2[vertices];
+                var first = frame * stride;
+
+                for (var v = 0; v < vertices; v++)
+                {
+                    uvs[v] = new Vector2(
+                        emitter.textureLists[first + v * 2],
+                        emitter.textureLists[first + v * 2 + 1]);
+                }
+
+                filter.sharedMesh.uv = uvs;
+
+                particle.Frames[i] = frame;
+            }
         }
 
         // The five built-in shapes the client's engine makes in code, and the cylinder. The vertices
@@ -380,6 +489,8 @@ namespace Top.Client.App
                 }
 
                 var age = now - particle.Start;
+
+                Animate(particle, age);
 
                 particle.Root.localRotation = Quaternion.AngleAxis(_spin * age, Vector3.up);
 
