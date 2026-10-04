@@ -182,6 +182,7 @@ namespace Top.Client.App
                     layer.color = Tone(colour, colour == GlowColour.None ? 0f : strength);
                 }
 
+                // A layer made here keeps the art it was given; only its colour moves.
                 skin.enabled = colour != GlowColour.None;
             }
 
@@ -282,6 +283,17 @@ namespace Top.Client.App
             layer.transform.localScale = Vector3.one;
 
             shape.sharedMesh = filter.sharedMesh;
+
+            // The layer wears the item's own art. A material with no texture draws white under an
+            // additive shader whatever colour is asked of it, and a tint over white is nearly white -
+            // so the art the item already has is what the colour is laid on.
+            var art = skin != null ? skin.sharedMaterial : null;
+
+            made.sharedMaterial = Material(
+                GlowColour.None,
+                0f,
+                art != null ? art.mainTexture : null);
+
             made.enabled = false;
 
             _shell = made;
@@ -292,11 +304,10 @@ namespace Top.Client.App
         /// <summary>
         /// An additive material for a glow layer made here. <br/>
         /// The client's glow is a second pass over the same triangles rather than anything modelled, so
-        /// it is drawn additively - the light is added to what is under it rather than replacing it. No
-        /// texture: the colour is the whole of it, and the shader's own white sheet takes a colour as
-        /// well as any art would.
+        /// it is drawn additively - the light is added to what is under it rather than replacing it. The
+        /// art is the item's own, and the colour is laid over it.
         /// </summary>
-        private static Material Material(GlowColour colour, float strength)
+        private static Material Material(GlowColour colour, float strength, Texture texture)
         {
             var shader = Shader.Find("Legacy Shaders/Particles/Additive");
 
@@ -310,7 +321,14 @@ namespace Top.Client.App
                 shader = Shader.Find("Sprites/Default");
             }
 
-            return new Material(shader) { color = Tone(colour, strength) };
+            var made = new Material(shader) { color = Tone(colour, strength) };
+
+            if (texture != null)
+            {
+                made.mainTexture = texture;
+            }
+
+            return made;
         }
 
         /// <summary>
