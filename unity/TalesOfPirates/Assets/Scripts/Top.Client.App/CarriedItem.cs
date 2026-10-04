@@ -68,6 +68,12 @@ namespace Top.Client.App
         /// <summary>The layer the glow is drawn on: the second material of a model that has one.</summary>
         private const int GlowLayer = 1;
 
+        /// <summary>How long the client's glow takes to walk its texture round once.</summary>
+        private const float LitAnimationSeconds = 6f;
+
+        /// <summary>The clock the glow drifts on, which belongs to the scene rather than to this thing.</summary>
+        private float _clock;
+
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
         {
@@ -89,6 +95,11 @@ namespace Top.Client.App
 
         private void LateUpdate()
         {
+            // The scene's own clock, so that a weapon taken up later is at the same place in the glow's
+            // walk as one that has been carried all along - the light is moving over the item, not
+            // starting when someone first looked at it.
+            _clock = Time.timeSinceLevelLoad;
+
             var safe = Zone.IsSafe(transform.root.position);
 
             // Hung again not only when the state changes but whenever the name it should hang on does,
@@ -124,8 +135,13 @@ namespace Top.Client.App
         /// </summary>
         private void Colour(bool changed, GlowColour colour, float strength)
         {
+            // The glow is walked every frame, not only when the colour changes: the walk is the
+            // animation, and one that stopped the moment the setting settled would leave the light
+            // standing still on the item.
             if (!changed)
             {
+                Drift();
+
                 return;
             }
 
@@ -165,6 +181,43 @@ namespace Top.Client.App
                 skin.enabled = colour != GlowColour.None;
                 skin.sharedMaterial = Material(texture, strength);
             }
+
+            Drift();
+        }
+
+        /// <summary>
+        /// Walks a glow's texture across itself, one whole tile and round again. <br/>
+        /// Taken from the client's own animation for a lit item - lwLitAnimTexCoord360posuv, the one
+        /// every entry of its item data names - which moves the texture's coordinates from nought to
+        /// one over three hundred and sixty frames and starts over. Six seconds a pass, at the sixty
+        /// frames a second the client counts in. It is why a lit item in the client looks as if light
+        /// is moving over it rather than a flat sheet of colour lying on it.
+        /// </summary>
+        private void Drift()
+        {
+            if (_lit == GlowColour.None)
+            {
+                return;
+            }
+
+            var skin = Shell();
+            var material = skin == null ? null : skin.sharedMaterial;
+
+            if (_own)
+            {
+                var worn = skin.sharedMaterials;
+
+                material = worn.Length > GlowLayer ? worn[GlowLayer] : null;
+            }
+
+            if (material == null)
+            {
+                return;
+            }
+
+            var at = Mathf.Repeat(_clock / LitAnimationSeconds, 1f);
+
+            material.mainTextureOffset = new Vector2(at, at);
         }
 
         /// <summary>
