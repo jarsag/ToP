@@ -1,0 +1,18 @@
+{
+  "version": 15,
+  "partName": "jj03",
+  "length": 0.0,
+  "emitters": [
+    {
+      "type": "Strip",
+      "partName": "0000000a1",
+      "model": "jj03.eff",
+      "texture": "1",
+      "count": 1,
+      "life": 4.5,
+      "step": 0.0,
+      "delayTime": 0.0,
+      "playTime": 0.0
+    }
+  ]
+}

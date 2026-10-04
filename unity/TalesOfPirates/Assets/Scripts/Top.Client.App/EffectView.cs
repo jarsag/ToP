@@ -26,15 +26,20 @@ namespace Top.Client.App
 
         // Play it once and be done, as the client does, or keep throwing particles for as long as it is
         // switched on. Once is the default: an effect is a flash, not a fountain.
-        [SerializeField] private bool _once = true;
+        // How long a particle lives and how often another is let go, if the effect has no .par to say
+        // so. With one, its own numbers are used and these are not read - they were written by hand to
+        // give the effect something to age by before the .par was read at all.
+        [SerializeField] private float _life = 4.5f;
+        [SerializeField] private float _rate = 6f;
+
+        // Once, the effect ran its length and stopped until it was switched off and on again. It now
+        // breathes for as long as the scene lasts, so there is nothing left to switch: the field stays
+        // only so that scenes carrying it keep their meaning, and is out of the inspector.
+        [HideInInspector] [SerializeField] private bool _once = true;
 
         [SerializeField] private bool _key = true;
 
-        // How long a particle lives, how many come a second, how fast each turns on the spot, and how
-        // big the whole thing is. The effect stays where it is put: it is worn on the weapon rather
-        // than thrown from it, so there is no speed and no direction to get wrong.
-        [SerializeField] private float _life = 4.5f;
-        [SerializeField] private float _rate = 6f;
+        // How fast the effect turns about the node it hangs from, in degrees a second.
         [SerializeField] private float _spin = 60f;
         [SerializeField] private float _scale = 1f;
 
@@ -78,10 +83,44 @@ namespace Top.Client.App
             public Emitter[] emitters;
         }
 
+        // The .par beside an effect: the system that throws one copy of it about rather than the copy
+        // itself. An .eff is the shape of a single particle; the .par says how long that particle
+        // lives, how often another is let go, and how many may be alive at once - which is what decides
+        // whether an effect is a flash or something that breathes for as long as the scene lasts.
+        [Serializable]
+        private class Par
+        {
+            public int version;
+            public string partName;
+            public float length;
+            public ParEmitter[] emitters;
+        }
+
+        [Serializable]
+        private class ParEmitter
+        {
+            public string type;
+            public string partName;
+            public string model;
+            public string texture;
+
+            // How long each particle lives, how often one is let go, and how many may be alive at once.
+            public int count;
+            public float life;
+            public float step;
+            public float delayTime;
+            public float playTime;
+        }
+
         private class Particle
         {
             public Transform Root;
             public float Start;
+
+            // How long this copy lives, and which system let it go - the fields a system owns rather
+            // than the copy.
+            public float Life;
+            public ParEmitter Emitter;
 
             // The shapes of one particle, kept so the texture's own animation can be stepped into
             // them without looking for them again every frame, and the window each is showing.
@@ -91,13 +130,24 @@ namespace Top.Client.App
 
         private readonly List<Particle> _particles = new List<Particle>();
         private Sheet _sheet;
-        private Transform _holder;
-        private float _next;
 
-        private bool _played;
+        // The system that throws a copy of the effect about, when the effect has one.
+        private Par _par;
+
+        private Transform _holder;
+
+        // The clock everything is measured on, and what is owed to the emitters. Together they are why
+        // an effect breathes for as long as the scene lasts rather than running its length and stopping.
+        private float _clock;
+        private float _owed;
 
         private void Start()
         {
+            // The clock starts with the scene and never starts again, so an effect that is switched on
+            // part way through comes in where it would have been, as the client's does - it does not
+            // begin from nothing because the object holding it was only just switched on.
+            _clock = Time.timeSinceLevelLoad;
+
             if (_on)
             {
                 Begin();
@@ -118,25 +168,106 @@ namespace Top.Client.App
                 }
             }
 
+            _clock = Time.timeSinceLevelLoad;
+
             if (_on)
             {
                 Begin();
 
-                // Once: one particle, and nothing more until it is switched off and on again. Otherwise
-                // particles keep coming for as long as it is on.
-                if (!_once || !_played)
-                {
-                    Throw();
-
-                    _played = _once;
-                }
+                // Breathe, for as long as the scene lasts. Nothing here ends the effect and nothing
+                // begins it again: a particle is let go whenever the system says one is due, and taken
+                // away when its own time is up, so the effect is always the same age as the scene.
+                Emit();
             }
             else
             {
-                _played = false;
+                Stop();
             }
 
             Live();
+        }
+
+        /// <summary>
+        /// Lets a particle go when the system says one is due. <br/>
+        /// The system is the .par: it says how long a particle lives, how often another is let go and
+        /// how many may be alive at once. How often is a time between particles rather than a count a
+        /// second, and a system that names none is one that lets a particle go as soon as the last has
+        /// gone - which is a single particle that is replaced the moment it dies.
+        /// </summary>
+        private void Emit()
+        {
+            if (_holder == null || _sheet == null)
+            {
+                return;
+            }
+
+            // With no system to ask, the fields written by hand stand in: so many particles a second,
+            // each living as long as Life says.
+            if (_par == null || _par.emitters == null || _par.emitters.Length == 0)
+            {
+                _owed += Time.deltaTime;
+
+                var every = 1f / Mathf.Max(0.5f, _rate);
+
+                while (_owed >= every)
+                {
+                    _owed -= every;
+
+                    Throw(null);
+                }
+
+                return;
+            }
+
+            foreach (var emitter in _par.emitters)
+            {
+                var since = _clock - emitter.delayTime;
+
+                if (since < 0f)
+                {
+                    continue;
+                }
+
+                // Past its play time a system lets nothing more go; zero means it never stops.
+                if (emitter.playTime > 0f && since > emitter.playTime)
+                {
+                    continue;
+                }
+
+                var alive = 0;
+
+                foreach (var particle in _particles)
+                {
+                    if (particle.Emitter == emitter)
+                    {
+                        alive++;
+                    }
+                }
+
+                if (alive >= emitter.count)
+                {
+                    continue;
+                }
+
+                // A system that names no time between particles lets one go as soon as there is room,
+                // which is what makes a single particle's effect continuous rather than stuttered.
+                if (emitter.step <= 0f)
+                {
+                    Throw(emitter);
+
+                    continue;
+                }
+
+                _owed += Time.deltaTime;
+
+                while (_owed >= emitter.step && alive < emitter.count)
+                {
+                    _owed -= emitter.step;
+                    alive++;
+
+                    Throw(emitter);
+                }
+            }
         }
 
         private void OnDisable()
@@ -169,6 +300,18 @@ namespace Top.Client.App
                 }
 
                 Log.Info($"effect {_effect}: {_sheet.emitters.Length} shape(s) per particle");
+
+                // The system that throws a copy of the shape about, if the effect has one. Without it
+                // there is still an effect - one shape at the mount - so a missing .par is not a
+                // failure; the fields written by hand stand in for what it would have said.
+                var system = Resources.Load<TextAsset>($"Effect/{_effect}.par");
+
+                if (system != null)
+                {
+                    _par = JsonUtility.FromJson<Par>(system.text);
+
+                    Log.Info($"effect {_effect}: .par with {(_par?.emitters?.Length ?? 0)} system(s)");
+                }
             }
 
             var mount = Where();
@@ -192,14 +335,16 @@ namespace Top.Client.App
             _holder.localRotation = Quaternion.Euler(_holderTurn);
         }
 
-        private void Throw()
+        /// <summary>
+        /// Lets one copy of the effect go. The system it belongs to is carried with it, because that is
+        /// what says how long this copy lives and when the next is due.
+        /// </summary>
+        private void Throw(ParEmitter from)
         {
-            if (_holder == null || Time.time < _next)
+            if (_holder == null)
             {
                 return;
             }
-
-            _next = Time.time + 1f / Mathf.Max(0.5f, _rate);
 
             var root = new GameObject("Particle").transform;
 
@@ -214,10 +359,15 @@ namespace Top.Client.App
                 frames.Add(-1);
             }
 
+            // With no system to ask, the hand-written life stands in; with one, its own.
+            var span = from != null && from.life > 0.01f ? from.life : _life;
+
             _particles.Add(new Particle
             {
                 Root = root,
-                Start = Time.time,
+                Start = _clock,
+                Life = span > 0.05f ? span : 1f,
+                Emitter = from,
                 Meshes = meshes.ToArray(),
                 Frames = frames.ToArray(),
             });
@@ -462,11 +612,13 @@ namespace Top.Client.App
             return mesh;
         }
 
+        /// <summary>
+        /// Ages every particle and takes away the ones whose time is up. <br/>
+        /// Nothing here ends the effect: a particle finishing is not the effect finishing, and another
+        /// is let go in its place, so the effect is as old as the scene for as long as the scene lasts.
+        /// </summary>
         private void Live()
         {
-            var now = Time.time;
-            var life = _life > 0.05f ? _life : 1f;
-
             for (var i = _particles.Count - 1; i >= 0; i--)
             {
                 var particle = _particles[i];
@@ -478,17 +630,15 @@ namespace Top.Client.App
                     continue;
                 }
 
-                var at = (now - particle.Start) / life;
+                var age = _clock - particle.Start;
 
-                if (at >= 1f)
+                if (age >= particle.Life)
                 {
                     Destroy(particle.Root.gameObject);
                     _particles.RemoveAt(i);
 
                     continue;
                 }
-
-                var age = now - particle.Start;
 
                 Animate(particle, age);
 
@@ -499,7 +649,7 @@ namespace Top.Client.App
                 // share of the lifetime instead made a long-lived particle crawl into view and a
                 // short-lived one blink.
                 var grow = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(age / 0.25f));
-                var fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((age - (life - 0.5f)) / 0.5f));
+                var fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((age - (particle.Life - 0.5f)) / 0.5f));
                 var tint = new Color(fade, fade, fade, fade);
 
                 foreach (var skin in particle.Root.GetComponentsInChildren<Renderer>(true))
@@ -633,6 +783,11 @@ namespace Top.Client.App
             return sleeping;
         }
 
+        /// <summary>
+        /// Takes the particles away and leaves the node they hang from standing, so that switching the
+        /// effect off and on again is not a restart: the clock both the effect's turn and its textures
+        /// are measured on belongs to the scene and is never begun again.
+        /// </summary>
         private void Stop()
         {
             foreach (var particle in _particles)
@@ -644,13 +799,6 @@ namespace Top.Client.App
             }
 
             _particles.Clear();
-
-            if (_holder != null)
-            {
-                Destroy(_holder.gameObject);
-
-                _holder = null;
-            }
         }
     }
 }
