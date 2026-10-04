@@ -59,6 +59,12 @@ namespace Top.Client.App
 
         private float _strength = -1f;
 
+        /// <summary>The renderer the glow is drawn on, once it is known or has been made.</summary>
+        private MeshRenderer _shell;
+
+        /// <summary>Whether that layer came with the model rather than being made here.</summary>
+        private bool _own;
+
         /// <summary>The layer the glow is drawn on: the second material of a model that has one.</summary>
         private const int GlowLayer = 1;
 
@@ -126,24 +132,90 @@ namespace Top.Client.App
             _lit = colour;
             _strength = strength;
 
-            var skin = GetComponentInChildren<MeshRenderer>();
-            var worn = skin == null ? null : skin.sharedMaterials;
+            var skin = Shell();
+            var texture = colour == GlowColour.None
+                ? null
+                : Resources.Load<Texture2D>($"Effect/glow_{colour.ToString().ToLowerInvariant()}");
 
-            if (worn == null || worn.Length <= GlowLayer)
+            if (skin == null)
             {
                 if (colour != GlowColour.None)
                 {
-                    Log.Info($"{name} has no glow layer to colour");
+                    Log.Info($"{name} has no shape to lay a glow over");
                 }
 
                 return;
             }
 
-            worn[GlowLayer] = colour == GlowColour.None
-                ? Material(null, 0f)
-                : Material(Resources.Load<Texture2D>($"Effect/glow_{colour.ToString().ToLowerInvariant()}"), strength);
+            _shell = skin;
 
-            skin.sharedMaterials = worn;
+            // A layer of the model's own is one material among several on one renderer, and it keeps
+            // its place: taking it out of the list would shift the materials behind it onto the wrong
+            // triangles. A layer made here is a renderer of its own and is simply switched off.
+            if (_own)
+            {
+                var worn = skin.sharedMaterials;
+
+                worn[GlowLayer] = Material(texture, strength);
+
+                skin.sharedMaterials = worn;
+            }
+            else
+            {
+                skin.enabled = colour != GlowColour.None;
+                skin.sharedMaterial = Material(texture, strength);
+            }
+        }
+
+        /// <summary>
+        /// The layer the glow is drawn on, made the first time it is wanted. <br/>
+        /// An item whose model carries a second, additive layer already glows - the client turns that
+        /// one on and off - and that layer is used as it stands. A model with a single layer has
+        /// nothing to turn on, and one is made for it here: the same triangles, drawn a second time
+        /// additively over themselves. That is what the client's glow is, and making it from the shape
+        /// that is already there is what lets an item the client's own data left dark be lit.
+        /// </summary>
+        private MeshRenderer Shell()
+        {
+            if (_shell != null)
+            {
+                return _shell;
+            }
+
+            var skin = GetComponentInChildren<MeshRenderer>();
+            var worn = skin == null ? null : skin.sharedMaterials;
+
+            // A model that came with a layer of its own.
+            if (worn != null && worn.Length > GlowLayer)
+            {
+                _shell = skin;
+                _own = true;
+
+                return _shell;
+            }
+
+            var filter = GetComponentInChildren<MeshFilter>();
+
+            if (filter == null || filter.sharedMesh == null)
+            {
+                return null;
+            }
+
+            var layer = new GameObject("Glow");
+            var made = layer.AddComponent<MeshRenderer>();
+            var shape = layer.AddComponent<MeshFilter>();
+
+            layer.transform.SetParent(filter.transform, worldPositionStays: false);
+            layer.transform.localPosition = Vector3.zero;
+            layer.transform.localRotation = Quaternion.identity;
+            layer.transform.localScale = Vector3.one;
+
+            shape.sharedMesh = filter.sharedMesh;
+            made.enabled = false;
+
+            _shell = made;
+
+            return _shell;
         }
 
         /// <summary>
