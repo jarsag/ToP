@@ -325,35 +325,35 @@ namespace Top.Client.App
         [SerializeField] private CarriedItem.GlowColour _glow = CarriedItem.GlowColour.None;
 
         /// <summary>How hard the glow is laid on, the client drawing one at the strength its tier asks.</summary>
-        [Range(0f, 3f)] [SerializeField] private float _glowStrength = 1f;
+        [SerializeField] private float _glowStrength = 1f;
 
         /// <summary>
         /// How the glow's sheet is laid over the item: how many times it repeats and how far it is
         /// shifted. A sheet and an item are each of a size of their own, so how much of the sheet ends
         /// up on the item is a matter of taste.
         /// </summary>
-        [CarriedItem.RangeVector(0f, 6f, "across", "along")] [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 2.2f);
+        [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 2.2f);
 
-        [CarriedItem.RangeVector(-1f, 1f, "across", "along")] [SerializeField] private Vector2 _glowOffset = Vector2.zero;
+        [SerializeField] private Vector2 _glowOffset = Vector2.zero;
 
         /// <summary>
         /// How fast the glow's sheet drifts over the item, in tiles a second on each axis. A still
         /// sheet with a figure in it reads as a pattern painted on the item; a moving one as light
         /// about it.
         /// </summary>
-        [CarriedItem.RangeVector(-0.5f, 0.5f, "across", "along")] [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
+        [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
 
         /// <summary>
         /// Everything darker than this on the glow's sheet is left out rather than added, so that a
         /// sheet with dark figures in it lights the figures instead of lifting the whole item faintly.
         /// </summary>
-        [Range(0f, 1f)] [SerializeField] private float _glowCutoff;
+        [SerializeField] private float _glowCutoff;
 
         /// <summary>
         /// How far the glow's colour is from grey: nought leaves it grey, one is the colour as it
         /// stands, and past one it is pushed further.
         /// </summary>
-        [Range(0f, 3f)] [SerializeField] private float _glowSaturation = 1f;
+        [SerializeField] private float _glowSaturation = 1f;
 
         /// <summary>
         /// The glow a carried thing should wear: its colour, how hard it is laid on, and how its sheet

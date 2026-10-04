@@ -15,26 +15,6 @@ namespace Top.Client.App
     public class CarriedItem : MonoBehaviour
     {
         /// <summary>
-        /// A pair of numbers drawn as two sliders rather than one box of two numbers. It is on the
-        /// editor side, where a drawer draws it; the settings themselves are plain pairs so that the
-        /// runtime needs nothing of the editor to read them.
-        /// </summary>
-        public class RangeVectorAttribute : PropertyAttribute
-        {
-            public RangeVectorAttribute(float min, float max, params string[] names)
-            {
-                Min = min;
-                Max = max;
-                Names = names;
-            }
-
-            public float Min { get; }
-
-            public float Max { get; }
-
-            public string[] Names { get; }
-        }
-        /// <summary>
         /// Which colour the thing's own glow is, out of the four the client's items carry: a red, a
         /// blue, a yellow and a green. <br/>
         /// A glowing item is not one model but two laid over each other - the item's own material, and a
@@ -58,7 +38,7 @@ namespace Top.Client.App
         /// </summary>
         [SerializeField] private GlowColour _glow = GlowColour.None;
 
-        [Range(0f, 3f)] [SerializeField] private float _glowStrength = 1f;
+        [SerializeField] private float _glowStrength = 1f;
 
         /// <summary>
         /// How a glow layer made here lays its sheet over the item: how many times it repeats, and how
@@ -69,29 +49,29 @@ namespace Top.Client.App
         /// the client's own sword measures - a sheet keeping its own proportions over it is a picture
         /// rather than a smear.
         /// </summary>
-        [CarriedItem.RangeVector(0f, 6f, "across", "along")] [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 2.2f);
+        [SerializeField] private Vector2 _glowTiling = new Vector2(1f, 2.2f);
 
-        [CarriedItem.RangeVector(-1f, 1f, "across", "along")] [SerializeField] private Vector2 _glowOffset = Vector2.zero;
+        [SerializeField] private Vector2 _glowOffset = Vector2.zero;
 
         /// <summary>
         /// How fast the glow's sheet drifts over the item, in tiles a second on each axis. Nothing is
         /// still about a light: a sheet with a figure in it, moved, reads as light about the item and
         /// not as a pattern painted on it.
         /// </summary>
-        [CarriedItem.RangeVector(-0.5f, 0.5f, "across", "along")] [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
+        [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
 
         /// <summary>
         /// Everything darker than this on the glow's sheet is left out rather than added. A sheet with
         /// dark figures in it would otherwise lift the whole item faintly instead of lighting them.
         /// </summary>
-        [Range(0f, 1f)] [SerializeField] private float _glowCutoff;
+        [SerializeField] private float _glowCutoff;
 
         /// <summary>
         /// How far the glow's colour is from grey: nought leaves it grey, one is the colour as it
         /// stands, and past one it is pushed further. A glow too vivid for the item under it, or too
         /// pale to be seen on it, is a matter of this rather than of which colour was picked.
         /// </summary>
-        [Range(0f, 3f)] [SerializeField] private float _glowSaturation = 1f;
+        [SerializeField] private float _glowSaturation = 1f;
 
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
