@@ -71,12 +71,15 @@ Shader "Top/Glow"
 
             half4 Frag(Varyings input) : SV_Target
             {
-                // How much light there is here at all, from the sheet's brightness and its alpha
+                // How much light there is here at all, from the sheet's own brightness and its alpha
                 // together, so that either a white sheet or a masked one gives a shape.
                 half4 sheet = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv);
-                half light = max(sheet.r, max(sheet.g, sheet.b)) * sheet.a;
+                half shape = max(sheet.r, max(sheet.g, sheet.b)) * sheet.a;
 
-                return half4(_GlowColour.rgb * light * _GlowColour.a * _Opacity, 0);
+                // Strictly the material's colour, with the sheet deciding only how much of it there is.
+                // Multiplying the sheet's own colour in as well would make the glow the colour of a
+                // picture - which is how a client's glow sheet works, and why one cannot be recoloured.
+                return half4(_GlowColour.rgb * shape * _GlowColour.a * _Opacity, 0);
             }
             ENDHLSL
         }

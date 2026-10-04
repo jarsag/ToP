@@ -50,6 +50,13 @@ namespace Top.Client.App
 
         [SerializeField] private Vector2 _glowOffset = Vector2.zero;
 
+        /// <summary>
+        /// How fast the glow's sheet drifts over the item, in tiles a second on each axis. Nothing is
+        /// still about a light: a sheet with a figure in it, moved, reads as light about the item and
+        /// not as a pattern painted on it.
+        /// </summary>
+        [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
+
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
 
@@ -96,10 +103,15 @@ namespace Top.Client.App
         /// <summary>The white spot a glow layer made here is drawn with, made once and shared.</summary>
         private static Texture2D _shape;
 
-        /// <summary>How the sheet of a glow layer made here is laid over the item, from the settings.</summary>
-        private static Vector2 _tiling = Vector2.one;
+        /// <summary>
+        /// How the sheet of a glow layer made here is laid over the item, from the settings: how many
+        /// times it repeats, where it starts, and how far it drifts a second from there.
+        /// </summary>
+        private Vector2 _tiling = Vector2.one;
 
-        private static Vector2 _offset = Vector2.zero;
+        private Vector2 _offset = Vector2.zero;
+
+        private Vector2 _speed = new Vector2(0.02f, 0.01f);
 
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
@@ -153,9 +165,11 @@ namespace Top.Client.App
             var strength = _hero != null ? _hero.GlowStrength : _glowStrength;
             var tiling = _hero != null ? _hero.GlowTiling : _glowTiling;
             var offset = _hero != null ? _hero.GlowOffset : _glowOffset;
+            var speed = _hero != null ? _hero.GlowDrift : _glowDrift;
 
             _tiling = tiling;
             _offset = offset;
+            _speed = speed;
 
             Colour(!Mathf.Approximately(_strength, strength) || colour != _lit, colour, strength);
         }
@@ -259,6 +273,14 @@ namespace Top.Client.App
             if (layer != null)
             {
                 layer.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
+
+                // And the sheet drifts, so that the figure in it moves over the item rather than
+                // sitting on it. Wound round so the numbers stay small: a sheet is one tile across,
+                // and how many times it has gone round is nothing anyone can see.
+                layer.mainTextureScale = _tiling;
+                layer.mainTextureOffset = new Vector2(
+                    Mathf.Repeat(_offset.x + (_clock * _speed.x), 1f),
+                    Mathf.Repeat(_offset.y + (_clock * _speed.y), 1f));
             }
         }
 
@@ -355,7 +377,7 @@ namespace Top.Client.App
         /// material. The client's own sheet for this colour is used as that shape, being a soft spot of
         /// the right size; a sheet of one's own can be put there instead.
         /// </summary>
-        private static Material Material(GlowColour colour, float strength)
+        private Material Material(GlowColour colour, float strength)
         {
             var shader = Shader.Find("Top/Glow");
 

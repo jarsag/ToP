@@ -337,6 +337,13 @@ namespace Top.Client.App
         [SerializeField] private Vector2 _glowOffset = Vector2.zero;
 
         /// <summary>
+        /// How fast the glow's sheet drifts over the item, in tiles a second on each axis. A still
+        /// sheet with a figure in it reads as a pattern painted on the item; a moving one as light
+        /// about it.
+        /// </summary>
+        [SerializeField] private Vector2 _glowDrift = new Vector2(0.02f, 0.01f);
+
+        /// <summary>
         /// The glow a carried thing should wear: its colour, how hard it is laid on, and how its sheet
         /// is laid over the item. Read by the thing itself, which is made at runtime and has no other
         /// way back to these settings - and read every frame, so a colour picked in the inspector while
@@ -349,6 +356,8 @@ namespace Top.Client.App
         public Vector2 GlowTiling => _glowTiling;
 
         public Vector2 GlowOffset => _glowOffset;
+
+        public Vector2 GlowDrift => _glowDrift;
 
 
         /// <summary>How a carried thing sits in a hand, for whatever is hanging on one.</summary>
