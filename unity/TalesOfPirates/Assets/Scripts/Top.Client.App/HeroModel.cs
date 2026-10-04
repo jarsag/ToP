@@ -328,22 +328,13 @@ namespace Top.Client.App
         [SerializeField] private float _glowStrength = 1f;
 
         /// <summary>
-        /// Which way the glow walks over the item. The client's own animations differ mostly in this,
-        /// so it is the one thing about a glow that has to be picked rather than read: the item data
-        /// names a number and each number is a direction.
-        /// </summary>
-        [SerializeField] private CarriedItem.GlowDrift _glowDrift = CarriedItem.GlowDrift.Diagonal;
-
-        /// <summary>
-        /// The glow colour a carried thing should wear, how hard, and which way it walks. Read by the
-        /// thing itself, which is made at runtime and has no other way back to these settings - and read
-        /// every frame, so anything picked in the inspector while the game runs is picked up on the next.
+        /// The glow colour a carried thing should wear, and how hard. Read by the thing itself, which is
+        /// made at runtime and has no other way back to these settings - and read every frame, so a
+        /// colour picked in the inspector while the game runs is picked up on the next one.
         /// </summary>
         public CarriedItem.GlowColour GlowColour => _glow;
 
         public float GlowStrength => _glowStrength;
-
-        public CarriedItem.GlowDrift GlowDrift => _glowDrift;
 
 
         /// <summary>How a carried thing sits in a hand, for whatever is hanging on one.</summary>
