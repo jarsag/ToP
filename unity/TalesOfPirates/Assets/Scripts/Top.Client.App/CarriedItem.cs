@@ -165,24 +165,44 @@ namespace Top.Client.App
 
             _shell = skin;
 
-            // A layer of the model's own is one material among several on one renderer, and it keeps
-            // its place: taking it out of the list would shift the materials behind it onto the wrong
-            // triangles. A layer made here is a renderer of its own and is simply switched off.
+            // A layer of the model's own already carries the art and the blend the client gave it, so it
+            // is tinted rather than replaced: a material made from nothing has no texture, and an
+            // additive shader with no texture draws white whatever colour is asked for. A layer made
+            // here has no art of its own and is ours to build.
             if (_own)
             {
-                var worn = skin.sharedMaterials;
-
-                worn[GlowLayer] = Material(colour, strength);
-
-                skin.sharedMaterials = worn;
+                Tint(colour, strength);
             }
             else
             {
+                var layer = skin.sharedMaterial;
+
+                if (layer != null)
+                {
+                    layer.color = Tone(colour, colour == GlowColour.None ? 0f : strength);
+                }
+
                 skin.enabled = colour != GlowColour.None;
-                skin.sharedMaterial = Material(colour, strength);
             }
 
             Breathe();
+        }
+
+        /// <summary>
+        /// Puts a colour on the glow layer the model brought, leaving its own art and blend alone. A
+        /// glow that is off is drawn nowhere rather than left in its own colour, which would light the
+        /// item whether one asked for it or not.
+        /// </summary>
+        private void Tint(GlowColour colour, float strength)
+        {
+            var worn = _shell.sharedMaterials;
+
+            if (worn == null || worn.Length <= GlowLayer || worn[GlowLayer] == null)
+            {
+                return;
+            }
+
+            worn[GlowLayer].color = Tone(colour, colour == GlowColour.None ? 0f : strength);
         }
 
         /// <summary>
@@ -199,19 +219,23 @@ namespace Top.Client.App
                 return;
             }
 
-            var material = _own && _shell.sharedMaterials.Length > GlowLayer
-                ? _shell.sharedMaterials[GlowLayer]
-                : _shell.sharedMaterial;
-
-            if (material == null)
-            {
-                return;
-            }
-
             var at = Mathf.Sin(_clock / BreathSeconds * Mathf.PI * 2f) * 0.5f + 0.5f;
             var strength = _strength * Mathf.Lerp(1f - BreathDepth, 1f, at);
 
-            material.color = Tone(_lit, strength);
+            // The layer keeps whatever art and blend the model gave it, so only the tint moves.
+            if (_own)
+            {
+                Tint(_lit, strength);
+
+                return;
+            }
+
+            var layer = _shell.sharedMaterial;
+
+            if (layer != null)
+            {
+                layer.color = Tone(_lit, strength);
+            }
         }
 
         /// <summary>
@@ -266,11 +290,11 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// An additive material for a glow layer, in one flat colour. <br/>
+        /// An additive material for a glow layer made here. <br/>
         /// The client's glow is a second pass over the same triangles rather than anything modelled, so
         /// it is drawn additively - the light is added to what is under it rather than replacing it. No
-        /// texture: the colour is the whole of it, which is what a glow over an item amounts to once
-        /// nothing is moving across it.
+        /// texture: the colour is the whole of it, and the shader's own white sheet takes a colour as
+        /// well as any art would.
         /// </summary>
         private static Material Material(GlowColour colour, float strength)
         {
