@@ -63,6 +63,13 @@ namespace Top.Client.App
         /// </summary>
         [SerializeField] private float _glowCutoff;
 
+        /// <summary>
+        /// How far the glow's colour is from grey: nought leaves it grey, one is the colour as it
+        /// stands, and past one it is pushed further. A glow too vivid for the item under it, or too
+        /// pale to be seen on it, is a matter of this rather than of which colour was picked.
+        /// </summary>
+        [SerializeField] private float _glowSaturation = 1f;
+
         /// <summary>Which hand it belongs to: five right, six left.</summary>
         private int _slot = 5;
 
@@ -105,6 +112,8 @@ namespace Top.Client.App
 
         private const string Cutoff = "_Cutoff";
 
+        private const string Saturation = "_Saturation";
+
         private const string Scale = "_GlowScale";
 
         private const string Shift = "_GlowOffset";
@@ -140,6 +149,8 @@ namespace Top.Client.App
         private Vector2 _speed = new Vector2(0.02f, 0.01f);
 
         private float _edge;
+
+        private float _depth = 1f;
 
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
@@ -195,11 +206,13 @@ namespace Top.Client.App
             var offset = _hero != null ? _hero.GlowOffset : _glowOffset;
             var speed = _hero != null ? _hero.GlowDrift : _glowDrift;
             var edge = _hero != null ? _hero.GlowCutoff : _glowCutoff;
+            var depth = _hero != null ? _hero.GlowSaturation : _glowSaturation;
 
             _tiling = tiling;
             _offset = offset;
             _speed = speed;
             _edge = edge;
+            _depth = depth;
 
             Colour(!Mathf.Approximately(_strength, strength) || colour != _lit, colour, strength);
         }
@@ -463,6 +476,7 @@ namespace Top.Client.App
             made.SetColor(Tint, tint);
             made.SetColor(Legacy, Color.white);
             made.SetFloat(Cutoff, _edge);
+            made.SetFloat(Saturation, _depth);
 
             // On the engine's own additive shader the colour is the picture's, so what is put there is
             // the sheet of that colour; ours takes the colour itself.

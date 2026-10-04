@@ -6,6 +6,11 @@ Shader "Top/Glow"
         // colour is not used - Glow Colour is - so that one sheet can be any of them.
         [MainTexture] _BaseMap("Glow Map", 2D) = "white" {}
         [HDR] _GlowColour("Glow Colour", Color) = (1, 1, 1, 1)
+
+        // How far from grey the colour is: nought leaves it grey, one is the colour as it stands, and
+        // past one it is pushed further. A glow that is too vivid for the item under it, or too pale to
+        // be seen on it, is a matter of this rather than of which colour was picked.
+        _Saturation("Saturation", Range(0, 3)) = 1
         _Opacity("Opacity", Range(0, 1)) = 1
 
         // Everything darker than this on the sheet is left out rather than added, so that a sheet with
@@ -57,6 +62,7 @@ Shader "Top/Glow"
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
                 half4 _GlowColour;
+                half _Saturation;
                 half _Opacity;
                 half _Cutoff;
                 float4 _GlowScale;
@@ -106,7 +112,15 @@ Shader "Top/Glow"
                 // Strictly the material's colour, with the sheet deciding only how much of it there is.
                 // Multiplying the sheet's own colour in as well would make the glow the colour of a
                 // picture - which is how a client's glow sheet works, and why one cannot be recoloured.
-                return half4(_GlowColour.rgb * shape * _GlowColour.a * _Opacity, 0);
+                half3 lit = _GlowColour.rgb;
+
+                // Pulled towards grey or pushed away from it. The weights are the eye's own: green
+                // carries most of what is seen as brightness and blue least, so a colour turned grey
+                // by them keeps the brightness it looked like it had.
+                half grey = dot(lit, half3(0.299h, 0.587h, 0.114h));
+                lit = lerp(grey.xxx, lit, _Saturation);
+
+                return half4(lit * shape * _GlowColour.a * _Opacity, 0);
             }
             ENDHLSL
         }

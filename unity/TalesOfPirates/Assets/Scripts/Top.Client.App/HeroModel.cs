@@ -350,6 +350,12 @@ namespace Top.Client.App
         [SerializeField] private float _glowCutoff;
 
         /// <summary>
+        /// How far the glow's colour is from grey: nought leaves it grey, one is the colour as it
+        /// stands, and past one it is pushed further.
+        /// </summary>
+        [SerializeField] private float _glowSaturation = 1f;
+
+        /// <summary>
         /// The glow a carried thing should wear: its colour, how hard it is laid on, and how its sheet
         /// is laid over the item. Read by the thing itself, which is made at runtime and has no other
         /// way back to these settings - and read every frame, so a colour picked in the inspector while
@@ -366,6 +372,8 @@ namespace Top.Client.App
         public Vector2 GlowDrift => _glowDrift;
 
         public float GlowCutoff => _glowCutoff;
+
+        public float GlowSaturation => _glowSaturation;
 
 
         /// <summary>How a carried thing sits in a hand, for whatever is hanging on one.</summary>
