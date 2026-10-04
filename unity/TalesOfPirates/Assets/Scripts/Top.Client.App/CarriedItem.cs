@@ -77,8 +77,11 @@ namespace Top.Client.App
         /// <summary>The clock the glow breathes on, which belongs to the scene rather than to this thing.</summary>
         private float _clock;
 
-        /// <summary>The soft spot a glow layer made here is drawn with, made once and shared.</summary>
-        private static Texture2D _bloom;
+        /// <summary>
+        /// The material the glow layer of a model's own carried before anything was put on it, kept so
+        /// that asking for no glow gives the item its own layer back rather than leaving a made one.
+        /// </summary>
+        private Material _glowBack;
 
         /// <summary>Tells it where it belongs, which is what the hero knows and it does not.</summary>
         public void Belong(HeroModel hero, int slot)
@@ -168,45 +171,41 @@ namespace Top.Client.App
 
             _shell = skin;
 
-            // A layer of the model's own already carries the art and the blend the client gave it, so it
-            // is tinted rather than replaced: a material made from nothing has no texture, and an
-            // additive shader with no texture draws white whatever colour is asked for. A layer made
-            // here has no art of its own and is ours to build.
+            // A layer of the model's own carries the client's own art and blend for it, and the colour
+            // comes from that art rather than from a tint - so what is put on it is how much of it is
+            // added. A layer made here has no art of its own, and is built from the client's glow sheet
+            // for the colour asked for.
             if (_own)
             {
-                Tint(colour, strength);
+                Set(GlowLayer, _glowBack);
+
+                if (colour != GlowColour.None)
+                {
+                    Set(GlowLayer, Material(colour, strength));
+                }
             }
             else
             {
-                var layer = skin.sharedMaterial;
-
-                if (layer != null)
-                {
-                    layer.color = Tone(colour, colour == GlowColour.None ? 0f : strength);
-                }
-
-                // A layer made here keeps the art it was given; only its colour moves.
                 skin.enabled = colour != GlowColour.None;
+                skin.sharedMaterial = Material(colour, strength);
             }
 
             Breathe();
         }
 
-        /// <summary>
-        /// Puts a colour on the glow layer the model brought, leaving its own art and blend alone. A
-        /// glow that is off is drawn nowhere rather than left in its own colour, which would light the
-        /// item whether one asked for it or not.
-        /// </summary>
-        private void Tint(GlowColour colour, float strength)
+        /// <summary>Puts a material on one layer of the glow layer's renderer, leaving the rest.</summary>
+        private void Set(int layer, Material material)
         {
             var worn = _shell.sharedMaterials;
 
-            if (worn == null || worn.Length <= GlowLayer || worn[GlowLayer] == null)
+            if (worn == null || worn.Length <= layer)
             {
                 return;
             }
 
-            worn[GlowLayer].color = Tone(colour, colour == GlowColour.None ? 0f : strength);
+            worn[layer] = material;
+
+            _shell.sharedMaterials = worn;
         }
 
         /// <summary>
@@ -226,19 +225,16 @@ namespace Top.Client.App
             var at = Mathf.Sin(_clock / BreathSeconds * Mathf.PI * 2f) * 0.5f + 0.5f;
             var strength = _strength * Mathf.Lerp(1f - BreathDepth, 1f, at);
 
-            // The layer keeps whatever art and blend the model gave it, so only the tint moves.
-            if (_own)
-            {
-                Tint(_lit, strength);
-
-                return;
-            }
-
-            var layer = _shell.sharedMaterial;
+            // A layer of the model's own carries the client's art for it, so what moves is how much of
+            // that art is added rather than what colour it is. White and an alpha: the colour is in the
+            // picture, and tinting it as well would only dull what the client drew.
+            var layer = _own && _shell.sharedMaterials.Length > GlowLayer
+                ? _shell.sharedMaterials[GlowLayer]
+                : _shell.sharedMaterial;
 
             if (layer != null)
             {
-                layer.color = Tone(_lit, strength);
+                layer.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
             }
         }
 
@@ -260,11 +256,13 @@ namespace Top.Client.App
             var skin = GetComponentInChildren<MeshRenderer>();
             var worn = skin == null ? null : skin.sharedMaterials;
 
-            // A model that came with a layer of its own.
+            // A model that came with a layer of its own. Its material is put back when no glow is asked
+            // for, so the item keeps the art and the blend its author gave it while it is dark.
             if (worn != null && worn.Length > GlowLayer)
             {
                 _shell = skin;
                 _own = true;
+                _glowBack = worn[GlowLayer];
 
                 return _shell;
             }
@@ -287,7 +285,7 @@ namespace Top.Client.App
 
             shape.sharedMesh = filter.sharedMesh;
 
-            made.sharedMaterial = Material(GlowColour.None, 0f, Bloom());
+            made.sharedMaterial = Material(GlowColour.None, 0f);
 
             made.enabled = false;
 
@@ -297,52 +295,18 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// The art a glow layer made here wears: a soft round spot, brightest at its middle and fading
-        /// to nothing at its edge. <br/>
-        /// It is made in code rather than carried as a file, being twelve lines of arithmetic and no
-        /// picture at all. The item's own art will not do - laid over itself additively it only makes
-        /// the item brighter, an item has no empty space in it for a colour to show through, and the
-        /// whole of what is wanted is a colour where the item is and none where it is not.
+        /// The art a glow layer made here wears, which is the client's own: one soft sheet of a single
+        /// colour per colour, taken from the item texture folder beside the effects. <br/>
+        /// A sheet of one colour is the whole of what a glow needs to be drawn with - the colour is in
+        /// the picture and the alpha is how far it reaches - and the item's own art will not do, because
+        /// laid over itself additively it only makes the item brighter. An item has no empty space in
+        /// it, so there is nowhere for a colour to show through.
         /// </summary>
-        private static Texture2D Bloom()
+        private static Texture Light(GlowColour colour)
         {
-            if (_bloom != null)
-            {
-                return _bloom;
-            }
-
-            const int size = 64;
-
-            _bloom = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
-                name = "glow bloom",
-                wrapMode = TextureWrapMode.Clamp,
-            };
-
-            var pixels = new Color32[size * size];
-
-            for (var y = 0; y < size; y++)
-            {
-                for (var x = 0; x < size; x++)
-                {
-                    var dx = x / (size - 1f) * 2f - 1f;
-                    var dy = y / (size - 1f) * 2f - 1f;
-
-                    // Full at the middle, nothing at the edge, and smoothed so that the fall-off has
-                    // no rim to it.
-                    var away = Mathf.Sqrt((dx * dx) + (dy * dy));
-                    var light = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(away));
-
-                    var value = (byte)(Mathf.Clamp01(light) * 255f);
-
-                    pixels[(y * size) + x] = new Color32(255, 255, 255, value);
-                }
-            }
-
-            _bloom.SetPixels32(pixels);
-            _bloom.Apply();
-
-            return _bloom;
+            return colour == GlowColour.None
+                ? null
+                : Resources.Load<Texture2D>($"Effect/glow_{colour.ToString().ToLowerInvariant()}");
         }
 
         /// <summary>
@@ -351,7 +315,7 @@ namespace Top.Client.App
         /// it is drawn additively - the light is added to what is under it rather than replacing it. The
         /// art is the item's own, and the colour is laid over it.
         /// </summary>
-        private static Material Material(GlowColour colour, float strength, Texture texture)
+        private static Material Material(GlowColour colour, float strength)
         {
             var shader = Shader.Find("Legacy Shaders/Particles/Additive");
 
@@ -365,42 +329,20 @@ namespace Top.Client.App
                 shader = Shader.Find("Sprites/Default");
             }
 
-            var made = new Material(shader) { color = Tone(colour, strength) };
+            var made = new Material(shader);
+
+            var texture = Light(colour);
 
             if (texture != null)
             {
                 made.mainTexture = texture;
             }
 
+            // White, so that the colour is whatever the picture is: the client's glow art is already a
+            // sheet of the colour it wants, and tinting it as well would only dull it.
+            made.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength));
+
             return made;
-        }
-
-        /// <summary>
-        /// The colour a glow of this kind is, at a given strength. <br/>
-        /// The four are the ones the client's items carry, and they are what the client's own glow
-        /// textures are: a flat sheet of one colour, which is why a colour of our own is the same thing
-        /// without the file. The alpha carries the strength, an additive material taking it as how much
-        /// light to add.
-        /// </summary>
-        private static Color Tone(GlowColour colour, float strength)
-        {
-            switch (colour)
-            {
-                case GlowColour.Red:
-                    return new Color(1f, 0.16f, 0.08f, Mathf.Clamp01(strength));
-
-                case GlowColour.Blue:
-                    return new Color(0.2f, 0.45f, 1f, Mathf.Clamp01(strength));
-
-                case GlowColour.Yellow:
-                    return new Color(1f, 0.85f, 0.25f, Mathf.Clamp01(strength));
-
-                case GlowColour.Green:
-                    return new Color(0.25f, 1f, 0.3f, Mathf.Clamp01(strength));
-
-                default:
-                    return new Color(1f, 1f, 1f, 0f);
-            }
         }
 
         /// <summary>Puts the thing the way the hero says it should look, in hand or on back.</summary>
