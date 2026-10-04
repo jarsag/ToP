@@ -32,6 +32,32 @@ namespace Top.Client.App
         }
 
         /// <summary>
+        /// Which way the glow walks across the item. <br/>
+        /// The client does not pick this once: every entry of its item data names an animation, and the
+        /// animations differ mostly in which way the light travels - along one axis, along both, or
+        /// round and round. The names here are the client's own procedures.
+        /// </summary>
+        public enum GlowDrift
+        {
+            /// <summary>Across both axes at once: lwLitAnimTexCoord360posuv, what the item data names.</summary>
+            Diagonal,
+
+            /// <summary>Up the item: lwLitAnimTexCoord2, which moves the texture's v alone.</summary>
+            Up,
+
+            /// <summary>Across the item: lwLitAnimTexCoord360posv, which moves its u alone.</summary>
+            Across,
+
+            /// <summary>Round and round: lwLitAnimTexCoord0.</summary>
+            Turn,
+
+            /// <summary>Still: no walk at all.</summary>
+            Still,
+        }
+
+        [SerializeField] private GlowDrift _drift = GlowDrift.Diagonal;
+
+        /// <summary>
         /// The colour to glow when nothing says otherwise - which is the case for a thing carried on its
         /// own, with no hero to ask. A thing the hero carries takes its colour from him instead, so that
         /// changing the setting changes what is already in his hand.
@@ -59,6 +85,9 @@ namespace Top.Client.App
 
         private float _strength = -1f;
 
+        /// <summary>Which way the glow is walking, so that a change of direction is noticed.</summary>
+        private GlowDrift _walk = GlowDrift.Diagonal;
+
         /// <summary>The renderer the glow is drawn on, once it is known or has been made.</summary>
         private MeshRenderer _shell;
 
@@ -83,14 +112,15 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// Tells it what colour to glow and how hard, when nothing else does. The hero's own settings
-        /// are asked for instead whenever there is a hero, so this is only what a thing carried by
-        /// nothing wears.
+        /// Tells it what colour to glow, how hard, and which way the glow walks, when nothing else does.
+        /// The hero's own settings are asked for instead whenever there is a hero, so this is only what
+        /// a thing carried by nothing wears.
         /// </summary>
-        public void Glow(GlowColour colour, float strength)
+        public void Glow(GlowColour colour, float strength, GlowDrift drift)
         {
             _glow = colour;
             _glowStrength = strength;
+            _drift = drift;
         }
 
         private void LateUpdate()
@@ -119,12 +149,17 @@ namespace Top.Client.App
             // was put on would be a weapon nobody could line up.
             Dress(safe);
 
-            // The glow too, for the same reason. The colour belongs to the hero's settings and is not
-            // held here, so a colour picked while the game runs arrives on the next frame.
-            var colour = _hero != null ? _hero.GlowColour : GlowColour.None;
-            var strength = _hero != null ? _hero.GlowStrength : 1f;
+            // The glow too, for the same reason. The colour and the way it walks belong to the hero's
+            // settings and are not held here, so anything picked while the game runs arrives next frame.
+            var colour = _hero != null ? _hero.GlowColour : _glow;
+            var strength = _hero != null ? _hero.GlowStrength : _glowStrength;
+            var drift = _hero != null ? _hero.GlowDrift : _drift;
 
-            Colour(colour != _lit || !Mathf.Approximately(_strength, strength), colour, strength);
+            var changed = colour != _lit
+                          || drift != _walk
+                          || !Mathf.Approximately(_strength, strength);
+
+            Colour(changed, colour, strength, drift);
         }
 
         /// <summary>
@@ -133,7 +168,7 @@ namespace Top.Client.App
         /// material and a layer taken away would shift the ones behind it onto the wrong triangles. A
         /// glow that is off is drawn nowhere, the layer's own art being a full sheet of colour.
         /// </summary>
-        private void Colour(bool changed, GlowColour colour, float strength)
+        private void Colour(bool changed, GlowColour colour, float strength, GlowDrift drift)
         {
             // The glow is walked every frame, not only when the colour changes: the walk is the
             // animation, and one that stopped the moment the setting settled would leave the light
@@ -147,6 +182,7 @@ namespace Top.Client.App
 
             _lit = colour;
             _strength = strength;
+            _walk = drift;
 
             var skin = Shell();
             var texture = colour == GlowColour.None
@@ -186,22 +222,28 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// Walks a glow's texture across itself, one whole tile and round again. <br/>
-        /// Taken from the client's own animation for a lit item - lwLitAnimTexCoord360posuv, the one
-        /// every entry of its item data names - which moves the texture's coordinates from nought to
-        /// one over three hundred and sixty frames and starts over. Six seconds a pass, at the sixty
-        /// frames a second the client counts in. It is why a lit item in the client looks as if light
-        /// is moving over it rather than a flat sheet of colour lying on it.
+        /// Walks a glow's texture across itself, one whole tile and round again, the way the animation
+        /// it names says. <br/>
+        /// The client keeps a small table of these - lwLitAnimTexCoord0 through TexCoord4 - and they
+        /// differ in which way the light goes rather than in anything else. Taken from that table: a
+        /// full pass takes three hundred and sixty frames, which is six seconds at the sixty frames a
+        /// second the client counts in, and it is why a lit item looks as if light moves over it.
         /// </summary>
         private void Drift()
         {
-            if (_lit == GlowColour.None)
+            if (_lit == GlowColour.None || _drift == GlowDrift.Still)
             {
                 return;
             }
 
             var skin = Shell();
-            var material = skin == null ? null : skin.sharedMaterial;
+
+            if (skin == null)
+            {
+                return;
+            }
+
+            var material = skin.sharedMaterial;
 
             if (_own)
             {
@@ -217,7 +259,33 @@ namespace Top.Client.App
 
             var at = Mathf.Repeat(_clock / LitAnimationSeconds, 1f);
 
-            material.mainTextureOffset = new Vector2(at, at);
+            switch (_drift)
+            {
+                case GlowDrift.Up:
+                    material.mainTextureOffset = new Vector2(0f, at);
+
+                    break;
+
+                case GlowDrift.Across:
+                    material.mainTextureOffset = new Vector2(at, 0f);
+
+                    break;
+
+                case GlowDrift.Turn:
+                    // Round the middle rather than across: the client turns the texture's own
+                    // coordinates about their centre, which is a spin about the texture rather than a
+                    // slide over it.
+                    material.mainTextureOffset = Vector2.zero;
+
+                    skin.transform.localRotation = Quaternion.Euler(0f, 0f, at * 360f);
+
+                    break;
+
+                default:
+                    material.mainTextureOffset = new Vector2(at, at);
+
+                    break;
+            }
         }
 
         /// <summary>
