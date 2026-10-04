@@ -43,6 +43,14 @@ namespace Top.Client.App
         [SerializeField] private float _spin = 60f;
         [SerializeField] private float _scale = 1f;
 
+        // How much of a particle's life it spends coming in and going out, and how long one copy is
+        // kept on after its time is up. A system that keeps a single copy alive - jj03's keeps one -
+        // has no seam to hide the change: the copy fades to nothing and the next one starts at
+        // nothing, so without something overlapping them the effect is seen to go and come back. The
+        // copy is held on for this much past its end, fading, while the next one is already arriving.
+        [SerializeField] private float _fade = 0.5f;
+        [SerializeField] private float _overlap = 0.5f;
+
         [Serializable]
         private class Emitter
         {
@@ -191,8 +199,12 @@ namespace Top.Client.App
         /// Lets a particle go when the system says one is due. <br/>
         /// The system is the .par: it says how long a particle lives, how often another is let go and
         /// how many may be alive at once. How often is a time between particles rather than a count a
-        /// second, and a system that names none is one that lets a particle go as soon as the last has
-        /// gone - which is a single particle that is replaced the moment it dies.
+        /// second, and a system that names none is one that lets a particle go as soon as room is free
+        /// - which for a system keeping one copy alive is a copy replaced the moment the last has gone.
+        /// <br/>
+        /// Room is counted a little before a copy's time is up, by Overlap, so that the next copy is
+        /// already arriving while this one is on its way out. Without that the effect is seen to go and
+        /// come back: one copy fading to nothing and the next starting from nothing.
         /// </summary>
         private void Emit()
         {
@@ -238,7 +250,9 @@ namespace Top.Client.App
 
                 foreach (var particle in _particles)
                 {
-                    if (particle.Emitter == emitter)
+                    // A copy whose own time is up is on its way out and does not hold a place: the next
+                    // one is due as soon as its time is up, not after the last of its fade has run.
+                    if (particle.Emitter == emitter && _clock - particle.Start < particle.Life)
                     {
                         alive++;
                     }
@@ -616,9 +630,15 @@ namespace Top.Client.App
         /// Ages every particle and takes away the ones whose time is up. <br/>
         /// Nothing here ends the effect: a particle finishing is not the effect finishing, and another
         /// is let go in its place, so the effect is as old as the scene for as long as the scene lasts.
+        /// <br/>
+        /// A particle is kept on past the end of its own time, fading, and it is that kept-on tail that
+        /// the next particle arrives into. Without it the effect is seen to go and come back: one copy
+        /// fading to nothing and the next starting from nothing, with nothing between them.
         /// </summary>
         private void Live()
         {
+            var overlap = Mathf.Max(_overlap, 0f);
+
             for (var i = _particles.Count - 1; i >= 0; i--)
             {
                 var particle = _particles[i];
@@ -632,7 +652,7 @@ namespace Top.Client.App
 
                 var age = _clock - particle.Start;
 
-                if (age >= particle.Life)
+                if (age >= particle.Life + overlap)
                 {
                     Destroy(particle.Root.gameObject);
                     _particles.RemoveAt(i);
@@ -644,13 +664,18 @@ namespace Top.Client.App
 
                 particle.Root.localRotation = Quaternion.AngleAxis(_spin * age, Vector3.up);
 
-                // The shapes come into place in a quarter of a second and only dim in the last half
-                // second of their life, so a particle is bright for as long as it lives. Fading over a
-                // share of the lifetime instead made a long-lived particle crawl into view and a
-                // short-lived one blink.
-                var grow = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(age / 0.25f));
-                var fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((age - (particle.Life - 0.5f)) / 0.5f));
-                var tint = new Color(fade, fade, fade, fade);
+                // In over the first stretch of its life and out over the last, both by the same amount:
+                // a copy that appears at nothing and reaches full brightness as the one before it goes
+                // is a change nobody can point at. A copy kept on past its time is going out over the
+                // whole of the time it is kept.
+                var fade = Mathf.Max(_fade, 0.01f);
+
+                var coming = Mathf.Clamp01(age / fade);
+                var goingOut = Mathf.Clamp01((age - (particle.Life - fade)) / (fade + overlap));
+
+                var face = Mathf.Min(coming, 1f - goingOut);
+
+                var tint = new Color(face, face, face, face);
 
                 foreach (var skin in particle.Root.GetComponentsInChildren<Renderer>(true))
                 {
@@ -663,8 +688,6 @@ namespace Top.Client.App
                         skin.material.color = tint;
                     }
                 }
-
-                particle.Root.localScale = Vector3.one * grow;
             }
         }
 
