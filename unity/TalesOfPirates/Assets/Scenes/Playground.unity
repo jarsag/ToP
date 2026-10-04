@@ -879,6 +879,8 @@ MonoBehaviour:
   _carryOffset: {x: 0, y: 0, z: 0}
   _backOffset: {x: 0, y: 0, z: 0}
   _carryScale: 1
+  _glow: 0
+  _glowStrength: 1
   _mountRight: dummy_9
   _mountLeft: dummy_6
   _backRight: dummy_21
@@ -897,7 +899,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Top.Client.App::Top.Client.App.Inventory
   _preview: {fileID: 0}
   _hero: {fileID: 0}
-  _owned: 940800006701000017020000c7020000630000008f130000i
+  _owned: 940800006701000017020000c7020000630000008f1300000500000017000000i
   _own: c6080000d00100008002000030030000i
 --- !u!114 &1959073044
 MonoBehaviour:
@@ -934,11 +936,14 @@ MonoBehaviour:
   _mount: dummy_1
   _withWeapon: 1
   _holderTurn: {x: 270, y: 0, z: 0}
-  _key: 1
   _life: 4.5
   _rate: 6
+  _once: 1
+  _key: 1
   _spin: 60
   _scale: 0.9
+  _fade: 0.5
+  _overlap: 0.5
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
