@@ -36,12 +36,40 @@ namespace Top.Client.App
 
         private readonly List<Enemy> _spawned = new List<Enemy>();
 
+        /// <summary>Whether a key can be pressed to hit what stands here, for trying a scene out.</summary>
+        [Header("Trying it out")]
+        [Tooltip("Key that hits what stands here, so that a number can be seen without a skill yet.")]
+        [SerializeField] private bool _testKey = true;
+
         /// <summary>What was put here, for anything that wants to hit it.</summary>
         public IReadOnlyList<Enemy> Spawned => _spawned;
 
         private async void Start()
         {
             await Fill();
+        }
+
+        /// <summary>
+        /// Hits one of the bodies here, as a skill would. There is nothing to hit with yet, so a key
+        /// does it - which is how a number is seen before there is a skill to make one.
+        /// </summary>
+        private void Update()
+        {
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+
+            if (!_testKey || keyboard == null || keyboard.spaceKey == null)
+            {
+                return;
+            }
+
+            if (!keyboard.spaceKey.wasPressedThisFrame || _spawned.Count == 0)
+            {
+                return;
+            }
+
+            var critical = Random.value < 0.25f;
+
+            _spawned[Random.Range(0, _spawned.Count)].Strike(Random.Range(1, 999), critical);
         }
 
         /// <summary>

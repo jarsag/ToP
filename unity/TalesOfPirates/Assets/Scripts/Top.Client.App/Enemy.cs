@@ -64,11 +64,19 @@ namespace Top.Client.App
             _instance?.Dispose();
         }
 
-        /// <summary>Says it was hit, which is all a mannequin can do about it.</summary>
-        public void Strike(int amount)
+        /// <summary>
+        /// Says it was hit, which is all a mannequin can do about it: the number goes up over it, and
+        /// whoever is listening hears about it.
+        /// </summary>
+        public void Strike(int amount, bool critical = false)
         {
+            DamageNumbers.Show(transform.position + (Vector3.up * Above), amount, critical);
+
             Struck?.Invoke(amount);
         }
+
+        /// <summary>How far over a body its numbers go, clear of the top of it.</summary>
+        private const float Above = 1.6f;
 
         /// <summary>
         /// Takes the model on and stands in a waiting clip. <br/>
