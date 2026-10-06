@@ -12,6 +12,12 @@ namespace Top.Client.Game.World
     {
         Safe,
         Spawn,
+
+        /// <summary>
+        /// Somewhere bodies to hit are put. A circle like a spawn point, and for the same reason: a
+        /// place a body is set down on has a reach rather than corners.
+        /// </summary>
+        EnemySpawn,
     }
 
     /// <summary>
@@ -158,7 +164,17 @@ namespace Top.Client.Game.World
         /// <summary>The colour a kind is drawn in, which is the only thing telling two kinds apart in a scene.</summary>
         public static Color Colour(ZoneKind kind)
         {
-            return kind == ZoneKind.Spawn ? new Color(1f, 0.85f, 0.2f) : new Color(0.3f, 1f, 0.4f);
+            switch (kind)
+            {
+                case ZoneKind.Spawn:
+                    return new Color(1f, 0.85f, 0.2f);
+
+                case ZoneKind.EnemySpawn:
+                    return new Color(1f, 0.35f, 0.3f);
+
+                default:
+                    return new Color(0.3f, 1f, 0.4f);
+            }
         }
 
         /// <summary>The shape test itself, kept apart from the scene so it can be reasoned about on its own.</summary>
@@ -166,7 +182,7 @@ namespace Top.Client.Game.World
         {
             var offset = world - centre;
 
-            if (kind == ZoneKind.Spawn)
+            if (kind == ZoneKind.Spawn || kind == ZoneKind.EnemySpawn)
             {
                 var radius = Mathf.Min(size.x, size.y) * 0.5f;
 
@@ -196,7 +212,7 @@ namespace Top.Client.Game.World
 
         private void OnDrawGizmos()
         {
-            if (_kind == ZoneKind.Spawn)
+            if (_kind == ZoneKind.Spawn || _kind == ZoneKind.EnemySpawn)
             {
                 Disc();
 
