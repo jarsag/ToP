@@ -6,17 +6,15 @@ using UnityEngine;
 namespace Top.Client.App
 {
     /// <summary>
-    /// Where bodies to hit are put: a marked place that fills itself with as many as it is told to.
-    /// <br/>
-    /// The same idea as the hero's own spawn points - a place a body is set down on - with the body
-    /// being something to practise on rather than the player. It stands beside a Zone marked as an
-    /// enemy spawn rather than on it, so that the marking of the ground and the filling of it stay two
-    /// separate things: a zone is geometry a designer drew, and this is what happens to be standing on
-    /// it. One zone may have several of these, and none.
+    /// Stands bodies to practise on, in one place. <br/>
+    /// Hung on a zone marked as an enemy spawn: the zone says where, and this says what - which body,
+    /// how many, and what clip it stands in. Hung rather than folded into the zone because the two are
+    /// different things: a zone is ground a designer drew, and this needs the converted tree to put
+    /// anything on it, which ground knows nothing about.
     /// </summary>
     public class EnemySpawn : MonoBehaviour
     {
-        [Header("What is put here")]
+        [Header("What stands here")]
         [SerializeField] private string _enemy = "dummy";
 
         [Tooltip("Model of the client's the body wears. The clips come inside it.")]
@@ -36,17 +34,24 @@ namespace Top.Client.App
 
         private readonly List<Enemy> _spawned = new List<Enemy>();
 
+        private bool _filled;
+
         /// <summary>Whether a key can be pressed to hit what stands here, for trying a scene out.</summary>
         [Header("Trying it out")]
         [Tooltip("Key that hits what stands here, so that a number can be seen without a skill yet.")]
         [SerializeField] private bool _testKey = true;
 
+        /// <summary>The kind of body that stands here, and how many.</summary>
+        public string Kind => _enemy;
+
+        public int Count => _count;
+
         /// <summary>What was put here, for anything that wants to hit it.</summary>
         public IReadOnlyList<Enemy> Spawned => _spawned;
 
-        private async void Start()
+        private void Start()
         {
-            await Fill();
+            Fill();
         }
 
         /// <summary>
@@ -73,47 +78,51 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// Puts the bodies down, spread evenly about the middle of the zone so that several do not
-        /// stand in one another.
+        /// Puts the bodies down where this stands, on the ground under it. <br/>
+        /// The place is read off the transform itself, so that moving the object in the scene moves what
+        /// stands on it: a spawner put down somewhere and its bodies put down somewhere else would be two
+        /// things to keep in step by hand.
         /// </summary>
         public async System.Threading.Tasks.Task Fill()
         {
+            if (_filled)
+            {
+                return;
+            }
+
             var preview = MapPreview.InScene();
 
             if (preview == null)
             {
-                Log.Warning("there is no map preview to take the enemies' models from");
+                Log.Warning($"'{name}' has no map preview to take the bodies' models from");
 
                 return;
             }
 
-            var zone = _zone != null ? _zone : GetComponent<Zone>();
-            var where = zone != null ? zone.transform.position : transform.position;
-            var reach = zone != null ? zone.Radius : 0f;
+            _filled = true;
 
             var count = Mathf.Max(_count, 0);
 
+            Log.Info($"'{name}' stands {count} {_enemy}(s) of model '{_model}' at {transform.position}");
+
             for (var i = 0; i < count; i++)
             {
-                var at = Ground(preview, where, reach, i, count, out var facing);
+                var at = Ground(preview, transform.position, i, count, out var facing);
 
-                var enemy = Enemy.Spawn(preview, transform.root, at, facing, _model, _idle, _scale);
+                var body = Enemy.Spawn(preview, transform.root, at, facing, _model, _idle, _scale);
 
-                _spawned.Add(enemy);
-
-                Log.Info($"an enemy of model '{_model}' stands at {at}");
+                _spawned.Add(body);
             }
 
             await System.Threading.Tasks.Task.CompletedTask;
         }
 
         /// <summary>
-        /// Where the i-th of a group stands: on the ground, spread round the middle of the zone. One
-        /// body stands in the middle rather than on the rim, where a group of one would look put there
-        /// by mistake.
+        /// Where the i-th of a group stands: on the ground under the place this is, and spread a little
+        /// about it when there are several. One body stands exactly where the object is, where a group of
+        /// one would look pushed aside if it did not.
         /// </summary>
-        private static Vector3 Ground(MapPreview preview, Vector3 where, float reach, int i, int count,
-            out float facing)
+        private static Vector3 Ground(MapPreview preview, Vector3 where, int i, int count, out float facing)
         {
             var at = where;
 
@@ -121,9 +130,9 @@ namespace Top.Client.App
             {
                 var turn = (Mathf.PI * 2f * i) / count;
 
-                // Two thirds of the way out rather than on the rim, so a body's own width does not
-                // hang over the edge of the place it was put.
-                at += new Vector3(Mathf.Cos(turn), 0f, Mathf.Sin(turn)) * reach * 0.66f;
+                // A short reach about the middle, so that a handful of bodies read as standing together
+                // rather than as a ring drawn on the ground.
+                at += new Vector3(Mathf.Cos(turn), 0f, Mathf.Sin(turn)) * (0.8f * count * 0.5f);
             }
 
             facing = Random.Range(0f, 360f);
@@ -135,10 +144,11 @@ namespace Top.Client.App
                 return at;
             }
 
+            // On the ground rather than at whatever height the object sits at: the map owns the height,
+            // and a body put down by hand is put down on the surface.
             var point = MapSpace.ToMap(at);
-            var height = map.SurfaceAt(point.x, point.y);
 
-            return MapSpace.ToWorld(point.x, point.y, height);
+            return MapSpace.ToWorld(point.x, point.y, map.SurfaceAt(point.x, point.y));
         }
     }
 }

@@ -128,9 +128,9 @@ namespace Top.Client.App.Editor
             _draw = EditorGUILayout.ToggleLeft("Draw zones in the scene view", _draw);
 
             EditorGUILayout.LabelField(_draw
-                    ? _kind == ZoneKind.Spawn
-                        ? "Click the ground to put a spawn point down: it is always two metres across. " +
-                          "Esc or the right button gives up nothing, because nothing is being held."
+                    ? PutDown(_kind)
+                        ? "Click the ground to put a " + Lower(_kind) + " down: it is always two metres " +
+                          "across. Esc or the right button gives up nothing, because nothing is being held."
                         : "Drag a diagonal over the ground, or click one corner and then the opposite one. " +
                           "Esc or the right button gives up the corner. Drawing hides the transform tools."
                     : "Turn drawing on, then draw a zone on the terrain. The transform tools come back " +
@@ -167,6 +167,7 @@ namespace Top.Client.App.Editor
             var zones = FindObjectsByType<Zone>();
             var safe = 0;
             var spawns = 0;
+            var enemies = 0;
 
             foreach (var zone in zones)
             {
@@ -175,13 +176,22 @@ namespace Top.Client.App.Editor
                     continue;
                 }
 
-                if (zone.Kind == ZoneKind.Spawn)
+                switch (zone.Kind)
                 {
-                    spawns++;
-                }
-                else
-                {
-                    safe++;
+                    case ZoneKind.Spawn:
+                        spawns++;
+
+                        break;
+
+                    case ZoneKind.EnemySpawn:
+                        enemies++;
+
+                        break;
+
+                    default:
+                        safe++;
+
+                        break;
                 }
             }
 
@@ -193,6 +203,12 @@ namespace Top.Client.App.Editor
             EditorGUILayout.LabelField(spawns == 0
                     ? "No spawn points: the hero starts where the scene puts him."
                     : $"{spawns} spawn point(s): the hero starts on one of them, picked at random.",
+                EditorStyles.miniLabel);
+
+            EditorGUILayout.LabelField(enemies == 0
+                    ? "No enemy spawns: nothing stands anywhere to practise on."
+                    : $"{enemies} enemy spawn(s): each stands what it says, and needs an EnemySpawn "
+                      + "on it to be filled.",
                 EditorStyles.miniLabel);
 
             EditorGUILayout.Space();
@@ -337,7 +353,7 @@ namespace Top.Client.App.Editor
                 SceneView.RepaintAll();
             }
 
-            if (_kind == ZoneKind.Spawn)
+            if (PutDown(_kind))
             {
                 // A spawn point is put down rather than drawn: one click marks the place,
                 // at the size a spawn point always is.
@@ -346,7 +362,7 @@ namespace Top.Client.App.Editor
 
                 if (current.type == EventType.MouseDown && current.button == 0 && !current.alt)
                 {
-                    if (!_pointing)
+                    if (!OnGround())
                     {
                         Debug.Log("zones: there is no ground under that click");
 
@@ -491,17 +507,80 @@ namespace Top.Client.App.Editor
             Handles.color = Zone.Colour(_kind);
             Handles.DrawAAPolyLine(4f, Shape(centre, size, _kind));
 
-            var label = _kind == ZoneKind.Spawn
+            var label = PutDown(_kind)
                 ? $"r {Mathf.Min(size.x, size.y) * 0.5f:0} m"
                 : $"{size.x:0} x {size.y:0} m";
 
             Handles.Label(Ground(centre) + (Vector3.up * 2f), label);
         }
 
+        /// <summary>
+        /// Whether a kind is put down as one click rather than drawn as a diagonal. <br/>
+        /// A place a body is set down on has a reach rather than corners - where the hero starts, and
+        /// where what he practises on stands - so both of those are rounds and both are put down.
+        /// </summary>
+        private static bool PutDown(ZoneKind kind)
+        {
+            return kind == ZoneKind.Spawn || kind == ZoneKind.EnemySpawn;
+        }
+
+        /// <summary>What a zone of this kind is called in the scene, so a hierarchy can be read.</summary>
+        private static string Name(ZoneKind kind)
+        {
+            switch (kind)
+            {
+                case ZoneKind.Spawn:
+                    return "Spawn point";
+
+                case ZoneKind.EnemySpawn:
+                    return "Enemy spawn";
+
+                default:
+                    return "Safe zone";
+            }
+        }
+
+        /// <summary>The same, for saying in a log or a hint.</summary>
+        private static string Lower(ZoneKind kind)
+        {
+            switch (kind)
+            {
+                case ZoneKind.Spawn:
+                    return "spawn point";
+
+                case ZoneKind.EnemySpawn:
+                    return "enemy spawn";
+
+                default:
+                    return "safe zone";
+            }
+        }
+
+        /// <summary>
+        /// Whether there is ground under the pointer, found again at the moment it is asked about
+        /// when what was found last frame will not do. <br/>
+        /// The pointer is kept from the mouse's own movements, and a click that comes before the mouse
+        /// has moved - the first click after the window is opened, or after anything has taken the
+        /// pointer's attention away - arrives with nothing remembered. Asking the map again costs a walk
+        /// of a ray and turns a click that was silently refused into one that lands.
+        /// </summary>
+        private bool OnGround()
+        {
+            if (_pointing)
+            {
+                return true;
+            }
+
+            _pointing = MapRay.TryHit(_data, HandleUtility.GUIPointToWorldRay(Event.current.mousePosition),
+                Reach, out _pointer);
+
+            return _pointing;
+        }
+
         /// <summary>The shape a kind is drawn as, which is the shape it is tested as: a rectangle, or a circle.</summary>
         private Vector3[] Shape(Vector2 centre, Vector2 size, ZoneKind kind)
         {
-            if (kind == ZoneKind.Spawn)
+            if (PutDown(kind))
             {
                 return Circle(centre, Mathf.Min(size.x, size.y) * 0.5f);
             }
@@ -583,7 +662,7 @@ namespace Top.Client.App.Editor
         {
             var map = MapSpace.ToMap(ground);
 
-            var zone = new GameObject(_kind == ZoneKind.Spawn ? "Spawn point" : "Safe zone");
+            var zone = new GameObject(Name(_kind));
 
             zone.transform.SetParent(Root().transform, worldPositionStays: true);
             zone.transform.position = MapSpace.ToWorld(map.x, map.y, _data.SurfaceAt(map.x, map.y));
@@ -595,7 +674,7 @@ namespace Top.Client.App.Editor
 
             Undo.RegisterCreatedObjectUndo(zone, "Mark a zone");
 
-            Debug.Log($"zones: put a {(_kind == ZoneKind.Spawn ? "spawn point" : "safe zone")} at map " +
+            Debug.Log($"zones: put a {Lower(_kind)} at map " +
                       $"({map.x:0}, {map.y:0}), {size.x:0}x{size.y:0} m");
 
             EditorSceneManager.MarkSceneDirty(zone.scene);

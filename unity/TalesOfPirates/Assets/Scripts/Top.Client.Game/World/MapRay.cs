@@ -74,8 +74,16 @@ namespace Top.Client.Game.World
 
         /// <summary>
         /// The ground under a world point, or infinity where the map has no
-        /// ground: past its tiles, or in a chunk the map never wrote. Infinity
-        /// rather than a height means a ray cannot land there.
+        /// ground: past its tiles. Infinity rather than a height means a ray
+        /// cannot land there.
+        /// <br/>
+        /// The height comes from the map's own field rather than from a chunk that has
+        /// been built, which is the whole point of walking a ray rather than casting
+        /// one: a map streams its chunks in around whoever is looking at it, so ground
+        /// on the far side of one - or ground no mesh has been built for at all - has
+        /// no chunk to be tested against. Asking for one there refuses a click the map
+        /// can answer perfectly well, which is what made a zone impossible to mark on a
+        /// map nothing had been built on yet.
         /// </summary>
         private static float Ground(MapData map, Vector3 world)
         {
@@ -83,8 +91,7 @@ namespace Top.Client.Game.World
             var x = Mathf.FloorToInt(point.x);
             var y = Mathf.FloorToInt(point.y);
 
-            if (x < 0 || y < 0 || x >= map.Width || y >= map.Height ||
-                !map.HasChunk(x / map.ChunkSize, y / map.ChunkSize))
+            if (x < 0 || y < 0 || x >= map.Width || y >= map.Height)
             {
                 return float.PositiveInfinity;
             }

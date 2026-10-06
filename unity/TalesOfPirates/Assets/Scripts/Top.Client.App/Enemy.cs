@@ -82,29 +82,56 @@ namespace Top.Client.App
         /// Takes the model on and stands in a waiting clip. <br/>
         /// The clips are inside the model - a client model carries its own animation - so the clip is
         /// named after the model it came in, which is why choosing a model is choosing its animations.
+        /// <br/>
+        /// The store is made here when nothing has handed one over, so that a body put in the scene by
+        /// hand - or one left over from a spawner that has since changed - still has somewhere to read
+        /// its model from. A store is only a reader of the converted tree, so making one costs nothing.
         /// </summary>
         private async void Start()
         {
+            if (_store == null)
+            {
+                var preview = MapPreview.InScene();
+
+                if (preview != null)
+                {
+                    _store = new ModelStore(preview.Content, preview.ModelShader);
+                }
+            }
+
             await Build();
         }
 
         private async Task Build()
         {
+            var path = $"models/character/{_model}.glb";
+
+            if (_store == null)
+            {
+                Log.Error($"there is nothing to read '{path}' from: no map preview was found in the scene");
+
+                return;
+            }
+
             try
             {
-                _instance = await _store.Instantiate($"models/character/{_model}.glb", transform);
+                _instance = await _store.Instantiate(path, transform);
             }
             catch (Exception exception)
             {
-                Log.Error($"could not put an enemy of model '{_model}' in the world", exception);
+                Log.Error($"could not put an enemy of model '{_model}' in the world: {path}", exception);
 
                 return;
             }
 
             if (_instance == null || _instance.Root == null)
             {
+                Log.Warning($"model '{path}' came back with nothing to draw");
+
                 return;
             }
+
+            Log.Info($"enemy '{_model}' loaded from {path}");
 
             transform.localScale = Vector3.one * _scale;
 

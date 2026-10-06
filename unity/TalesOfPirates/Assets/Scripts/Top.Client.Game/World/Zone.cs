@@ -141,6 +141,7 @@ namespace Top.Client.Game.World
         {
             var safe = 0;
             var spawns = 0;
+            var enemies = 0;
 
             foreach (var zone in Zones())
             {
@@ -149,17 +150,29 @@ namespace Top.Client.Game.World
                     continue;
                 }
 
-                if (zone._kind == ZoneKind.Spawn)
+                switch (zone._kind)
                 {
-                    spawns++;
-                }
-                else
-                {
-                    safe++;
+                    case ZoneKind.Spawn:
+                        spawns++;
+
+                        break;
+
+                    case ZoneKind.EnemySpawn:
+                        enemies++;
+
+                        break;
+
+                    default:
+                        safe++;
+
+                        break;
                 }
             }
 
-            return $"{safe} safe zone(s), {spawns} spawn point(s)";
+            // Every kind is named rather than only the safe ones: a count that lumps whatever it does not
+            // know into the first kind reads as a scene full of safe zones, which is what made a marked
+            // enemy spawn invisible in the one line that was meant to say what a scene holds.
+            return $"{safe} safe zone(s), {spawns} spawn point(s), {enemies} enemy spawn(s)";
         }
         /// <summary>The colour a kind is drawn in, which is the only thing telling two kinds apart in a scene.</summary>
         public static Color Colour(ZoneKind kind)
