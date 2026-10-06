@@ -89,6 +89,9 @@ namespace Top.Client.App
 
         private bool _hung;
 
+        /// <summary>The client's own type of the thing carried, which decides where it goes on a back.</summary>
+        private int _weapon;
+
         private GlowColour _lit;
 
         private float _strength = -1f;
@@ -160,6 +163,19 @@ namespace Top.Client.App
         {
             _hero = hero;
             _slot = slot;
+            _hung = false;
+        }
+
+        /// <summary>
+        /// Tells it what kind of thing it is, which is the client's own type of the item - a sword, a
+        /// shield, a coral. <br/>
+        /// It is what decides where the thing goes when it is not in a hand: the client's table of places
+        /// on the back is asked by kind, and a kind it has no place for keeps its hand. Nothing else about
+        /// the thing is needed for that, so a number is all that is passed.
+        /// </summary>
+        public void Knows(int weapon)
+        {
+            _weapon = weapon;
             _hung = false;
         }
 
@@ -619,21 +635,32 @@ namespace Top.Client.App
         }
 
         /// <summary>Which dummy it hangs on, out of the hand it belongs to and the state.</summary>
+        /// <summary>
+        /// Which dummy it hangs on, out of the hand it belongs to and the state. <br/>
+        /// In a hand it is always the hand. On the back it is where the client's own table puts a thing
+        /// of this kind - and a thing the table has no place for stays in the hand, which is one rule for
+        /// everything rather than a special case for the kinds it was never told about.
+        /// </summary>
         private string Mount(bool safe)
         {
-            if (_hero == null)
+            var hand = _slot == 6 ? "dummy_6" : "dummy_9";
+
+            if (!safe)
             {
-                return _slot == 6 ? "dummy_6" : "dummy_9";
+                return _hero != null ? (_slot == 6 ? _hero.MountLeft : _hero.MountRight) : hand;
             }
 
-            // Asked every frame rather than remembered: the names are settings, and one of them can
-            // be pointed at a node while the game runs.
-            if (_slot == 6)
+            var back = BackDummy.For(_weapon, _slot == 6);
+
+            if (back != null)
             {
-                return safe ? _hero.BackLeft : _hero.MountLeft;
+                return back;
             }
 
-            return safe ? _hero.BackRight : _hero.MountRight;
+            // No place on the back for this kind: it keeps its hand.
+            return _hero != null
+                ? (_slot == 6 ? _hero.MountLeft : _hero.MountRight)
+                : hand;
         }
 
         /// <summary>A dummy of the hero, preferring one that is switched on.</summary>

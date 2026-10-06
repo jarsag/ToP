@@ -595,7 +595,7 @@ namespace Top.Client.App
         /// a part of the body: it is a model whose own skeleton nothing drives, so it is hung
         /// by a holder on a dummy of the rig and goes wherever that dummy goes.
         /// </summary>
-        private async Task Carry(int slot, string path)
+        private async Task Carry(int slot, string path, int kind = 0)
         {
             if (_store == null)
             {
@@ -653,6 +653,7 @@ namespace Top.Client.App
             // Which mount it hangs on is not settled once: a weapon is in the hand out of a
             // safe zone and on the back inside one, and the thing watches for that itself.
             holder.AddComponent<CarriedItem>().Belong(this, slot);
+            holder.GetComponent<CarriedItem>().Knows(kind);
             holder.transform.localRotation = Quaternion.Euler(_carryRotation);
             holder.transform.localScale = Vector3.one * _carryScale;
 
@@ -762,7 +763,7 @@ namespace Top.Client.App
             return sleeping;
         }
 
-        public async Task Wear(int slot, string path)
+        public async Task Wear(int slot, string path, int kind = 0)
         {
             if (string.IsNullOrEmpty(path))
             {
@@ -777,10 +778,12 @@ namespace Top.Client.App
             }
 
             // A weapon is carried in a hand rather than worn on the body, so it does not go
-            // through the parts a body is dressed in.
+            // through the parts a body is dressed in. Its kind goes with it, because where a
+            // thing of that kind hangs when it is not in a hand is the client's business and
+            // differs by kind - and a kind with no place on a back keeps its hand.
             if (Carried(slot))
             {
-                await Carry(slot, path);
+                await Carry(slot, path, kind);
 
                 return;
             }

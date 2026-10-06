@@ -136,7 +136,7 @@ namespace Top.Client.App
                 return false;
             }
 
-            await _hero.Wear(item.Slot, item.Model);
+            await _hero.Wear(item.Slot, item.Model, item.Type);
 
             _equipped[item.Slot] = id;
 

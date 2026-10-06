@@ -20,6 +20,13 @@ namespace Top.Client.Game.Tables
         /// when the client names none, which is a hundred items out of six thousand.
         /// </summary>
         public string DropModel;
+
+        /// <summary>
+        /// The client's own kind of thing - a sword, a shield, a coral. It is not the slot it goes in:
+        /// two kinds may share a slot and still be put away differently, and a kind may have no place to
+        /// be put at all, which is why a thing's kind is carried about at all.
+        /// </summary>
+        public int Type;
     }
 
     /// <summary>
@@ -56,6 +63,7 @@ namespace Top.Client.Game.Tables
             item.Name = entry.Name;
             item.Icon = entry.Icon;
             item.Slot = entry.Slot;
+            item.Type = entry.Type;
             item.Model = Model(entry, playerClass);
             item.DropModel = entry.DropModel;
 
