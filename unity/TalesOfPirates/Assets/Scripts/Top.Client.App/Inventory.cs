@@ -39,6 +39,16 @@ namespace Top.Client.App
 
         private readonly Dictionary<int, int> _equipped = new Dictionary<int, int>();
 
+        /// <summary>
+        /// The two hands, out of the client's own places for equipment: its left hand is 6 and its right
+        /// is 9, and this port keeps the thin end of the body - head, body, gloves, shoes - starting at
+        /// one, so the same two places come out as 5 and 6 here. The two numbers stand beside each other
+        /// because they are the only two a thing can be moved between.
+        /// </summary>
+        private const int RightHand = 5;
+
+        private const int LeftHand = 6;
+
         private ItemCatalog _items;
 
         /// <summary>What the hero owns, by item id.</summary>
@@ -136,13 +146,42 @@ namespace Top.Client.App
                 return false;
             }
 
-            await _hero.Wear(item.Slot, item.Model, item.Type);
+            // A thing carried goes in the hand its kind belongs in - and in the other one when that is
+            // taken, which is how the client had it: a sword's own data names two places, the right hand
+            // and then the left, and both were used. Nothing else has a second place, so nothing else
+            // moves over.
+            var slot = Hand(item.Slot);
 
-            _equipped[item.Slot] = id;
+            await _hero.Wear(slot, item.Model, item.Type);
+
+            _equipped[slot] = id;
 
             Changed?.Invoke();
 
             return true;
+        }
+
+        /// <summary>
+        /// Which hand a thing goes in, out of the hand its kind belongs in: that one when it is free, and
+        /// the other when it is not. <br/>
+        /// Only the two hands, and only for what is carried: a slot of the body has no second place to
+        /// move to, and a thing worn there is simply displaced.
+        /// </summary>
+        private int Hand(int slot)
+        {
+            if (slot != RightHand && slot != LeftHand)
+            {
+                return slot;
+            }
+
+            if (!_equipped.ContainsKey(slot))
+            {
+                return slot;
+            }
+
+            var other = slot == RightHand ? LeftHand : RightHand;
+
+            return _equipped.ContainsKey(other) ? slot : other;
         }
 
         /// <summary>
