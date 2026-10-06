@@ -82,6 +82,16 @@ namespace Top.Conversion.Pipeline.Tables
         /// a left hand guard in the left. Zero for what is worn on the body instead, and for
         /// what is not carried at all - arrows, potions, materials.
         /// </summary>
+        /// <summary>
+        /// A coral - type 29 - is held in the left hand, which is where this port puts it rather
+        /// than where the client did. <br/>
+        /// The client's own type table stops at the weapons and the wearables it drew names for, and
+        /// the corals are numbered past it: its data calls them type 29 - 41 of them - and the type
+        /// table says nothing about 27, 28, 29 or 30 at all. What the client did with them is not
+        /// written down anywhere this port can read, and a coral is a thing a caster holds: a caster's
+        /// own skill says to equip one, and its model is held in the hand. It goes in the left, leaving
+        /// the right for the weapon.
+        /// </summary>
         private static int Hand(int type)
         {
             switch (type)
@@ -95,6 +105,7 @@ namespace Top.Conversion.Pipeline.Tables
                     return 5;
                 case 6:
                 case 11:
+                case 29:
                     return 6;
                 default:
                     return 0;
