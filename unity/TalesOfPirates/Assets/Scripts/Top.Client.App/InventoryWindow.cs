@@ -597,6 +597,25 @@ namespace Top.Client.App
             return false;
         }
 
+        /// <summary>
+        /// What is no longer in a hand that was: one of the two things seen there before, that is not the
+        /// thing just put on and is nowhere on the body now. <br/>
+        /// A thing put on and a thing taken off look the same from the outside - one number left, one
+        /// arrived - so the one that is gone is looked for rather than worked out.
+        /// </summary>
+        private int Gone(int wasRight, int wasLeft, int arrived)
+        {
+            foreach (var was in new[] { wasRight, wasLeft })
+            {
+                if (was != 0 && was != arrived && !WornNow(was))
+                {
+                    return was;
+                }
+            }
+
+            return 0;
+        }
+
         /// <summary>Whether the hero is wearing this, in which case it is not in the bag.</summary>
         private bool WornNow(int id)
         {
@@ -669,7 +688,11 @@ namespace Top.Client.App
 
             try
             {
-                var displaced = _inventory.Equipped(item.Slot);
+                // What stands in both hands before, so that whatever is gone afterwards can be found:
+                // which hand a carried thing ends up in is not known until it is on, so what it displaced
+                // cannot be read from one slot beforehand.
+                var wasRight = _inventory.Equipped(5);
+                var wasLeft = _inventory.Equipped(6);
 
                 if (!await Equip(id))
                 {
@@ -681,15 +704,18 @@ namespace Top.Client.App
                 // The cell it came from empties only now that the thing is really on.
                 Take(id);
 
-                if (displaced != 0 && displaced != id && !_inventory.IsOwn(displaced))
+                var displaced = Gone(wasRight, wasLeft, id);
+
+                if (displaced != 0 && !_inventory.IsOwn(displaced))
                 {
                     Store(displaced);
 
-                    Said($"  {Called(id)} is on, and {Called(displaced)} went into the bag");
+                    Said($"  {Called(id)} is on in slot {_inventory.SlotOf(id)}, "
+                         + $"and {Called(displaced)} went into the bag");
                 }
                 else
                 {
-                    Said($"  {Called(id)} is on");
+                    Said($"  {Called(id)} is on in slot {_inventory.SlotOf(id)}");
                 }
 
                 Redraw();

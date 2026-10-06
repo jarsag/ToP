@@ -63,6 +63,31 @@ namespace Top.Client.App
             return _equipped.TryGetValue(slot, out var id) ? id : 0;
         }
 
+        /// <summary>
+        /// The slot a thing is on, or zero when it is on nothing. <br/>
+        /// Asked after putting something on rather than worked out beforehand, because which hand a
+        /// thing ends up in is not the caller's to know: a carried thing goes in its own hand and in the
+        /// other when that one is taken. A window that assumed the slot it asked for is the slot it got
+        /// left the thing in the bag as well, and the hero wore it twice.
+        /// </summary>
+        public int SlotOf(int id)
+        {
+            if (id == 0)
+            {
+                return 0;
+            }
+
+            foreach (var pair in _equipped)
+            {
+                if (pair.Value == id)
+                {
+                    return pair.Key;
+                }
+            }
+
+            return 0;
+        }
+
         /// <summary>What an item is, for the class the hero is - what a bag draws a name and an icon from.</summary>
         public bool TryGet(int id, out ItemLookup item)
         {
