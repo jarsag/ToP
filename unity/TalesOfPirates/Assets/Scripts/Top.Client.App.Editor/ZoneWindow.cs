@@ -294,7 +294,10 @@ namespace Top.Client.App.Editor
             {
                 Outline();
 
-                if (_draw && _from != null && _pointing)
+                // The corner waiting to be closed is shown where the pointer is now. It is found again
+                // here rather than taken from the last mouse movement, so that a zone being drawn follows
+                // the pointer rather than standing still whenever no movement event has arrived.
+                if (_draw && _from != null && OnGround())
                 {
                     Preview(_from.Value, _pointer);
                 }
@@ -329,6 +332,13 @@ namespace Top.Client.App.Editor
         /// </summary>
         private void Drawing()
         {
+            var clicked = Event.current.type == EventType.MouseDown && Event.current.button == 0;
+
+            if (clicked)
+            {
+                Debug.Log($"zones: a click arrived - kind {_kind}, drawing {_draw}, holding {(PutDown(_kind) ? "nothing, it is put down" : "a shape")}");
+            }
+
             if (!_draw)
             {
                 _from = null;
@@ -397,22 +407,31 @@ namespace Top.Client.App.Editor
                 return;
             }
 
-            if (!_pointing)
+            // Found again at the moment it is asked about when what was found last frame will not do: the
+            // pointer is kept from the mouse's own movements, and a corner marked before the mouse has
+            // moved arrives with nothing remembered. A drawn zone needs its corner found the same way a
+            // put-down one needs its place found, or the first corner of every zone is silently dropped.
+            if (!OnGround())
             {
+                if (clicked)
+                {
+                    var ray = HandleUtility.GUIPointToWorldRay(Event.current.mousePosition);
+                    var onto = MapSpace.ToMap(ray.origin);
+                    var far = MapSpace.ToMap(ray.GetPoint(Reach));
+
+                    Debug.Log($"zones: a click arrived but no ground was found under it. "
+                              + $"map {_data.Width}x{_data.Height} tiles, "
+                              + $"ray starts over tile ({onto.x:0}, {onto.y:0}) at height {ray.origin.y:0.0} "
+                              + $"and reaches tile ({far.x:0}, {far.y:0}) after {Reach:0} units. "
+                              + $"The window is reading map {_mapId} out of {ContentRoot.Resolve(_contentRoot)}. "
+                              + Scene());
+                }
+
                 return;
             }
 
             if (current.type == EventType.MouseDown && current.button == 0 && !current.alt)
             {
-                if (!_pointing)
-                {
-                    Debug.Log("zones: there is no ground under that click");
-
-                    current.Use();
-
-                    return;
-                }
-
                 var first = _from == null;
 
                 // The first corner of a new zone; a corner already standing is
@@ -796,6 +815,27 @@ namespace Top.Client.App.Editor
                 Repaint();
                 SceneView.RepaintAll();
             }
+        }
+
+        /// <summary>
+        /// What the scene's own preview says it is holding, for comparing with what this window read.
+        /// The two are read apart - the preview only builds its map when the game runs, so in the editor
+        /// this window reads the map itself - and a window that read a different one refuses every click
+        /// the preview would have answered.
+        /// </summary>
+        private string Scene()
+        {
+            var preview = MapPreview.InScene();
+
+            if (preview == null)
+            {
+                return "The scene has no MapPreview at all.";
+            }
+
+            var data = preview.Data;
+
+            return $"The scene's preview holds {(data == null ? "no map yet" : $"{data.Width}x{data.Height}")}"
+                   + $" and sits at {preview.transform.position}.";
         }
 
         private IContentSource Source()
