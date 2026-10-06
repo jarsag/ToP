@@ -79,6 +79,16 @@ namespace Top.Client.App
         [SerializeField] private string _warMove = "0003_06_run2";
 
         /// <summary>
+        /// What the hero does when a skill goes off. A model of the client's names its own skill
+        /// actions - 0003_11_skill1 and its neighbours - so this is which of them a cast plays, and
+        /// empty means a cast makes no gesture at all.
+        /// </summary>
+        [SerializeField] private string _skill = "0003_11_skill1";
+
+        /// <summary>How long the cast gesture holds before the hero goes back to what he was doing.</summary>
+        [SerializeField] private float _skillHold = 0.9f;
+
+        /// <summary>
         /// How fast the hero moves while the move clip plays at its own speed.
         /// The original client paced these clips by movement, so walking slowly
         /// is the same clip played slower rather than another clip.
@@ -490,6 +500,31 @@ namespace Top.Client.App
 
             Play(_idle, _rate);
         }
+
+        /// <summary>
+        /// Makes the gesture of a cast. <br/>
+        /// It is a clip held rather than played and forgotten: a skill is cast from a standing start,
+        /// and a hero who went straight back to walking would cut his own gesture off. The hold lets go
+        /// of itself after the setting's own length - or at once, when no clip is named, which is what
+        /// a hero with nothing to do with his hands does.
+        /// </summary>
+        public void Cast()
+        {
+            if (string.IsNullOrEmpty(_skill))
+            {
+                return;
+            }
+
+            Holding = _skill;
+
+            Play(_skill, 1f);
+
+            CancelInvoke(nameof(LetGo));
+            Invoke(nameof(LetGo), Mathf.Max(_skillHold, 0.05f));
+        }
+
+        /// <summary>Which clip a cast plays, for anything that wants to know.</summary>
+        public string SkillClip => _skill;
 
 
         /// <summary>

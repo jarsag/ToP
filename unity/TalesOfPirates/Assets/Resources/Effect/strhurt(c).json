@@ -1,0 +1,42 @@
+{
+  "version": 7,
+  "technique": 0,
+  "emitters": [
+    {
+      "name": "strik(c).eff",
+      "effectType": 4,
+      "source": 5,
+      "destination": 7,
+      "length": 5,
+      "texture": "eff0283",
+      "model": "RectPlane",
+      "alpha": 1,
+      "size": [0, 0, 1],
+      "position": [0, 0, 0],
+      "angle": [3.141592, 0, 0],
+      "rotationLoop": 0,
+      "rotationLoopVector": [0, 0, 0, 0],
+      "textureFrameTime": 0.1,
+      "textureFrameStride": 8,
+      "textureLists": [0, 1, 0, 0, 1, 0, 1, 1]
+    },
+    {
+      "name": "new effect",
+      "effectType": 4,
+      "source": 5,
+      "destination": 7,
+      "length": 5,
+      "texture": "eff0283",
+      "model": "RectPlane",
+      "alpha": 1,
+      "size": [0, 0, 1],
+      "position": [0, 0, 0],
+      "angle": [0, 0, 0],
+      "rotationLoop": 0,
+      "rotationLoopVector": [0, 0, 0, 0],
+      "textureFrameTime": 0.1,
+      "textureFrameStride": 8,
+      "textureLists": [0, 1, 0, 0, 1, 0, 1, 1]
+    }
+  ]
+}
