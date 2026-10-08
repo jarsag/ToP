@@ -598,23 +598,45 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// What is no longer in a hand that was: one of the two things seen there before, that is not the
-        /// thing just put on and is nowhere on the body now. <br/>
+        /// What the body is wearing and holding, by slot, as it stands now. <br/>
+        /// Every slot of the body and both hands, because putting one thing on may replace another
+        /// anywhere - a breastplate replaces a breastplate, and a second sword takes the free hand.
+        /// </summary>
+        private int[] OnBody()
+        {
+            var worn = new int[BodySlots + 1];
+
+            for (var slot = 1; slot <= BodySlots; slot++)
+            {
+                worn[slot] = _inventory.Equipped(slot);
+            }
+
+            return worn;
+        }
+
+        /// <summary>
+        /// What is no longer on the body that was: something seen there before that is not the thing just
+        /// put on and is nowhere on the body now. <br/>
         /// A thing put on and a thing taken off look the same from the outside - one number left, one
         /// arrived - so the one that is gone is looked for rather than worked out.
         /// </summary>
-        private int Gone(int wasRight, int wasLeft, int arrived)
+        private int Gone(int[] was, int arrived)
         {
-            foreach (var was in new[] { wasRight, wasLeft })
+            for (var slot = 1; slot < was.Length; slot++)
             {
-                if (was != 0 && was != arrived && !WornNow(was))
+                var had = was[slot];
+
+                if (had != 0 && had != arrived && !WornNow(had))
                 {
-                    return was;
+                    return had;
                 }
             }
 
             return 0;
         }
+
+        /// <summary>How many slots of the body there are, the last two of them the hands.</summary>
+        private const int BodySlots = 6;
 
         /// <summary>Whether the hero is wearing this, in which case it is not in the bag.</summary>
         private bool WornNow(int id)
@@ -688,11 +710,12 @@ namespace Top.Client.App
 
             try
             {
-                // What stands in both hands before, so that whatever is gone afterwards can be found:
-                // which hand a carried thing ends up in is not known until it is on, so what it displaced
-                // cannot be read from one slot beforehand.
-                var wasRight = _inventory.Equipped(5);
-                var wasLeft = _inventory.Equipped(6);
+                // What stands on the body before, so that whatever is gone afterwards can be found: which
+                // hand a carried thing ends up in is not known until it is on, so what it displaced cannot
+                // be read from one slot beforehand. Every slot is taken, not only the hands - a set of
+                // clothes covers four of them, and reading the hands alone left a replaced breastplate
+                // nowhere at all, so it neither came off nor went into the bag.
+                var was = OnBody();
 
                 if (!await Equip(id))
                 {
@@ -704,7 +727,7 @@ namespace Top.Client.App
                 // The cell it came from empties only now that the thing is really on.
                 Take(id);
 
-                var displaced = Gone(wasRight, wasLeft, id);
+                var displaced = Gone(was, id);
 
                 if (displaced != 0 && !_inventory.IsOwn(displaced))
                 {
