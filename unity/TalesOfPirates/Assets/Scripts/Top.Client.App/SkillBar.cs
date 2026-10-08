@@ -110,6 +110,22 @@ namespace Top.Client.App
 
         private readonly List<Image> _swell = new List<Image>();
 
+        /// <summary>The icons, so that a slot can flash when its skill comes back.</summary>
+        private readonly List<Image> _icons = new List<Image>();
+
+        /// <summary>The seconds left, drawn over a slot that is cooling.</summary>
+        private readonly List<Text> _left = new List<Text>();
+
+        /// <summary>Until when a slot is flashing, once per coming back.</summary>
+        private readonly List<float> _flash = new List<float>();
+
+        /// <summary>How long a slot flashes when its skill comes back, and how bright it goes.</summary>
+        private const float FlashSeconds = 0.35f;
+
+        private static readonly Color Ready = new Color(1f, 1f, 0.65f);
+
+        private static readonly Color Spent = new Color(0.35f, 0.35f, 0.4f);
+
         private Canvas _canvas;
 
         /// <summary>The skill that would be cast now, which is the first one.</summary>
@@ -389,22 +405,84 @@ namespace Top.Client.App
                 icon.color = new Color(0.6f, 0.6f, 0.9f);
             }
 
-            // The dark sheet the cooldown is drawn with: full and opaque while the skill is spent, and
-            // shrunk away as it comes back. A round mask would be truer to the client, and a sheet is
-            // what there is to draw with until its own art is brought over.
+            // The dark sheet the cooldown is drawn with, swept away round the middle rather than lifted
+            // off the bottom: a skill coming back is a thing going round, and a sheet rising straight up
+            // reads as a bar being filled rather than as a clock running down.
             var shadow = Clear(frame.transform, "Cooling", 3f, 3f, size - 6f, size - 6f);
 
+            shadow.sprite = Sheet();
             shadow.color = new Color(0f, 0f, 0f, 0.75f);
             shadow.type = Image.Type.Filled;
-            shadow.fillMethod = Image.FillMethod.Vertical;
-            shadow.fillOrigin = (int)Image.OriginVertical.Bottom;
+            shadow.fillMethod = Image.FillMethod.Radial360;
+            shadow.fillOrigin = (int)Image.Origin360.Top;
+            shadow.fillClockwise = false;
             shadow.fillAmount = 0f;
 
             _swell.Add(shadow);
 
+            // The seconds left, over everything: a sweep says roughly how long, and a number says exactly.
+            var left = Count(frame.transform, size);
+
+            _left.Add(left);
+
+            _icons.Add(icon);
+            _flash.Add(0f);
+
             var label = KeyLabel(frame.transform, slot);
             label.text = slot == 0 ? "1" : (slot + 1).ToString();
         }
+
+        /// <summary>The seconds left over a slot, which is only up while the skill is cooling.</summary>
+        private static Text Count(Transform parent, float size)
+        {
+            var go = new GameObject("Left", typeof(Text));
+
+            var text = go.GetComponent<Text>();
+            var at = (RectTransform)go.transform;
+
+            at.SetParent(parent, false);
+            at.anchorMin = Vector2.zero;
+            at.anchorMax = Vector2.zero;
+            at.pivot = Vector2.zero;
+            at.anchoredPosition = new Vector2(0f, (size - 6f) * 0.5f - 10f);
+            at.sizeDelta = new Vector2(size - 6f, 20f);
+
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = 16;
+            text.fontStyle = FontStyle.Bold;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.color = Color.white;
+            text.text = string.Empty;
+
+            return text;
+        }
+
+        /// <summary>
+        /// A plain white sprite for the pieces that are only a colour. <br/>
+        /// A filled image needs one and cannot work without: the fill is done by moving the sprite's own
+        /// coordinates about, so an image with no sprite has no coordinates to move and is drawn whole
+        /// whatever its fill amount says - which is a black sheet lying over the icon from the moment the
+        /// game starts, with the cooldown apparently never having begun.
+        /// </summary>
+        private static Sprite Sheet()
+        {
+            if (_sheet != null)
+            {
+                return _sheet;
+            }
+
+            var pixel = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+
+            pixel.SetPixel(0, 0, Color.white);
+            pixel.Apply();
+
+            _sheet = Sprite.Create(pixel, new Rect(0f, 0f, 1f, 1f), new Vector2(0.5f, 0.5f));
+
+            return _sheet;
+        }
+
+        /// <summary>The white sprite, made once and shared by every filled piece.</summary>
+        private static Sprite _sheet;
 
         /// <summary>The key that casts a slot, drawn in its bottom corner.</summary>
         private static Text KeyLabel(Transform parent, int slot)
@@ -428,14 +506,63 @@ namespace Top.Client.App
             return text;
         }
 
-        /// <summary>Fills or empties each slot's shadow as its skill is spent and comes back.</summary>
+        /// <summary>
+        /// Spends and brings back each slot: the dark sheet sweeps away as the skill returns, the
+        /// seconds left are counted over it, and the icon flashes once when it is ready again. <br/>
+        /// The flash is what makes it readable at a glance - a sweep going round says roughly how long,
+        /// and a flash says that the waiting is over without anything having to be read.
+        /// </summary>
         private void Cool()
         {
             for (var i = 0; i < _skills.Count && i < _swell.Count; i++)
             {
+                var cooling = Mathf.Max(_skills[i].cooldown, 0.01f);
                 var left = _ready[i] - Time.time;
 
-                _swell[i].fillAmount = left <= 0f ? 0f : Mathf.Clamp01(left / Mathf.Max(_skills[i].cooldown, 0.01f));
+                if (left > 0f)
+                {
+                    var share = Mathf.Clamp01(left / cooling);
+
+                    _swell[i].fillAmount = share;
+
+                    if (i < _left.Count)
+                    {
+                        _left[i].text = Mathf.CeilToInt(left).ToString();
+                    }
+
+                    if (i < _icons.Count)
+                    {
+                        _icons[i].color = Spent;
+                    }
+
+                    continue;
+                }
+
+                // Just came back: the flash is started here rather than where the cast happens, because a
+                // skill can also come back while nothing is being pressed.
+                if (_swell[i].fillAmount > 0f)
+                {
+                    _swell[i].fillAmount = 0f;
+
+                    if (i < _flash.Count)
+                    {
+                        _flash[i] = Time.time + FlashSeconds;
+                    }
+                }
+
+                if (i < _left.Count)
+                {
+                    _left[i].text = string.Empty;
+                }
+
+                if (i < _icons.Count)
+                {
+                    var flashing = i < _flash.Count && Time.time < _flash[i];
+
+                    _icons[i].color = flashing
+                        ? Color.Lerp(Ready, Color.white, 1f - ((_flash[i] - Time.time) / FlashSeconds))
+                        : Color.white;
+                }
             }
         }
 
