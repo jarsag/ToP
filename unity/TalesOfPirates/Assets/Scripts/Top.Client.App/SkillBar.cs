@@ -39,6 +39,21 @@ namespace Top.Client.App
 
         /// <summary>The icon, by name under Resources/Ui.</summary>
         public string icon = "s0214";
+
+        /// <summary>
+        /// The gesture the hero makes. Empty keeps whatever clip the hero is set to cast with.
+        /// </summary>
+        public string clip = "0003_13_skill3";
+
+        /// <summary>
+        /// Where in the gesture the effect leaves the hero, nought at its first frame and one at its
+        /// last. <br/>
+        /// A blow does not leave the hand when the key is pressed: the client kept the frame in its
+        /// animation data, and a coral leaves the hand when the arm is furthest forward, which is part
+        /// way through the gesture. For the hero's third skill that frame is 6311 of a gesture running
+        /// 6284 to 6344, so the blow leaves 27 frames into a gesture of 60 - a little under half way.
+        /// </summary>
+        [Range(0f, 1f)] public float launch = 0.45f;
     }
 
     /// <summary>
@@ -59,6 +74,15 @@ namespace Top.Client.App
         [SerializeField] private int _slotSize = 52;
 
         [SerializeField] private float _scale = 1f;
+
+        /// <summary>How long the cursor keeps saying a skill is being aimed after the key is let go.</summary>
+        private const float CursorHold = 1f;
+
+        /// <summary>Where a cast is aimed: the same camera a walk is pointed with.</summary>
+        [SerializeField] private Camera _camera;
+
+        /// <summary>The map a cast is aimed on, which is the one the ground is read from.</summary>
+        [SerializeField] private MapPreview _preview;
 
         private HeroModel _hero;
 
@@ -101,12 +125,21 @@ namespace Top.Client.App
                 Cast(0);
             }
 
+            // Held down, the cursor keeps saying so: let go and it holds for its own moment longer, so
+            // that a tap of the key still shows what was aimed at.
+            if (pressed != null && pressed.isPressed)
+            {
+                GameCursor.Aiming(CursorHold);
+            }
+
             Cool();
         }
 
         /// <summary>
-        /// Casts the skill in a slot, if it is ready: the chain is worked out, every body on it is hit
-        /// and wears the effect, and the hero makes the gesture.
+        /// Casts the skill in a slot, if it is ready. <br/>
+        /// The route is worked out whole and at once, the cursor changes to say a skill is being aimed,
+        /// the hero makes the gesture, and the blows themselves leave his hand at the frame the skill's
+        /// own setting names - which is part way through the gesture, not at its start.
         /// </summary>
         public bool Cast(int slot)
         {
@@ -125,31 +158,80 @@ namespace Top.Client.App
 
             _ready[slot] = Time.time + Mathf.Max(skill.cooldown, 0.01f);
 
-            foreach (var body in bodies)
-            {
-                // The effect over the body it lands on, and the hurt said out loud. The numbers that
-                // go with it are not drawn yet - a blow is tried before it is read.
-                SkillEffect.Play(skill.effect, body.transform.position + (Vector3.up * 1.1f), skill.effectLife);
-
-                body.Strike(skill.damage);
-            }
+            // The cursor says a skill is being aimed while the key is held and a moment after it is let
+            // go, so that letting go does not snatch the cursor away at once.
+            GameCursor.Aiming(CursorHold);
 
             if (_hero != null)
             {
-                _hero.Cast();
+                if (!string.IsNullOrEmpty(skill.clip))
+                {
+                    _hero.SkillClip = skill.clip;
+                }
+
+                _hero.Cast(() => Land(skill, bodies), skill.launch);
+
+                Aimed(skill, bodies);
+
+                return true;
             }
 
-            Log.Info($"{skill.name}: {bodies.Count} body(ies) struck for {skill.damage} each");
+            Land(skill, bodies);
 
             return true;
         }
 
         /// <summary>
-        /// The bodies a skill lands on, in the order the chain reaches them: the one nearest the hero,
-        /// then the nearest to that one, then the nearest to that - never one already on the chain.
-        /// <br/>
+        /// Lets the blows go: every body on the route is hit and wears the effect, and each blow leaves
+        /// the place the one before it landed - the hero's own hand for the first. <br/>
+        /// A blow is not drawn over the body it hits: it starts where it was cast from and is turned down
+        /// the way it is going, so that it reads as leaving the hand and reaching for the body. The client
+        /// draws its effects the same way, reaching out along their own forward from where they are put.
+        /// </summary>
+        private void Land(Skill skill, List<Enemy> bodies)
+        {
+            var hand = _hero != null ? _hero.EffectFrom().position : transform.position;
+
+            for (var i = 0; i < bodies.Count; i++)
+            {
+                var body = bodies[i];
+                var at = body.transform.position + (Vector3.up * 1.1f);
+                var from = i == 0 ? hand : bodies[i - 1].transform.position + (Vector3.up * 1.1f);
+                var way = at - from;
+
+                // Where it starts, the way it is going, and - for everything after the first - the way
+                // it came, so that the bodies read as one chain and not as a handful of separate blows.
+                SkillEffect.Play(skill.effect, from, skill.effectLife, null,
+                    i == 0 ? (Vector3?)null : from,
+                    way.sqrMagnitude > 0.0001f ? way : (Vector3?)null);
+
+                body.Strike(skill.damage);
+            }
+
+            Log.Info($"{skill.name}: {bodies.Count} body(ies) struck for {skill.damage} each");
+        }
+
+        /// <summary>Where a cast is aimed, said out loud so that a miss can be told from a bad aim.</summary>
+        private void Aimed(Skill skill, List<Enemy> bodies)
+        {
+            var pointed = Pointed();
+            var hero = _hero != null ? _hero.transform.position : transform.position;
+
+            Log.Info($"{skill.name}: aimed at {pointed} (the hero stands at {hero}), "
+                     + $"found {bodies.Count} body(ies) within {skill.range} of it");
+        }
+
+        /// <summary>
+        /// The bodies a skill lands on, in the order the chain reaches them: the one nearest where the
+        /// pointer is, then the nearest to that one, then the nearest to that - never one already on the
+        /// chain. <br/>
         /// Worked out whole before anything happens, which is what makes a chained blow land at once:
         /// there is no bolt finding its way, only the route it would have taken.
+        /// <br/>
+        /// The first body is the one the player pointed at, not the one nearest the hero: a skill is
+        /// aimed, and reaching for whatever happens to stand closest would take the choice away. The
+        /// pointer is read on the map's own height field, the same way a walk is, and falls back to the
+        /// hero when it names no ground - so a cast from off the map still lands on what is nearest.
         /// </summary>
         public List<Enemy> Chain(Skill skill)
         {
@@ -161,9 +243,7 @@ namespace Top.Client.App
                 return chain;
             }
 
-            var from = _hero != null ? _hero.transform.position : transform.position;
-
-            var first = Nearest(all, from, skill.range, null);
+            var first = Nearest(all, Pointed(), skill.range, null);
 
             if (first == null)
             {
@@ -186,6 +266,29 @@ namespace Top.Client.App
             }
 
             return chain;
+        }
+
+        /// <summary>
+        /// Where the pointer is on the ground, or the hero when it is over no ground at all. <br/>
+        /// Read the way a walk is read, so that aiming at a place and walking to it mean the same thing
+        /// by the same code - and so that aiming off the edge of the map is simply the hero's own place
+        /// rather than a refusal to cast.
+        /// </summary>
+        public Vector3 Pointed()
+        {
+            var fallback = _hero != null ? _hero.transform.position : transform.position;
+            var camera = _camera != null ? _camera : Camera.main;
+            var map = _preview != null ? _preview.Data : null;
+            var mouse = Mouse.current;
+
+            if (camera == null || map == null || mouse == null)
+            {
+                return fallback;
+            }
+
+            var ray = camera.ScreenPointToRay(mouse.position.ReadValue());
+
+            return MapRay.TryHit(map, ray, 4000f, out var hit) ? hit : fallback;
         }
 
         /// <summary>The closest body within reach that is not already on the chain.</summary>

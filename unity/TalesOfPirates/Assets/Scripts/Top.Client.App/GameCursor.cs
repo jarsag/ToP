@@ -25,6 +25,30 @@ namespace Top.Client.App
             Pick,
             Camera,
             Land,
+            Skill,
+        }
+
+        /// <summary>
+        /// Until when a skill is being aimed, so that the cursor says so. <br/>
+        /// Set from outside rather than worked out here: the cursor knows nothing of skills, and a
+        /// skill asking the cursor to say it is aiming is the whole of what the two have to say to
+        /// each other. Kept as an instant rather than a flag because a skill is aimed for a moment.
+        /// <br/>
+        /// It is put back to nought when the cursor comes up, and it has to be: it is a static of the
+        /// editor's own domain, which outlives a play session, while the clock it is compared against
+        /// starts again from nought. A moment left over from the last session is a moment far in this
+        /// one's future, so the cursor came up already saying a skill was being aimed and stayed that
+        /// way until the clock caught up with it.
+        /// </summary>
+        private static float _aiming;
+
+        /// <summary>
+        /// Says a skill is being aimed, and for how long. Called again while the key is held, so that
+        /// letting go lets the cursor go back one moment later rather than at once.
+        /// </summary>
+        public static void Aiming(float seconds)
+        {
+            _aiming = Mathf.Max(_aiming, Time.unscaledTime + Mathf.Max(seconds, 0f));
         }
 
         private class Frame
@@ -75,6 +99,9 @@ namespace Top.Client.App
 
         private void Awake()
         {
+            // Nothing is being aimed when the game starts, whatever was being aimed when it last ran.
+            _aiming = 0f;
+
             Show(Wanted.Normal);
         }
 
@@ -100,6 +127,13 @@ namespace Top.Client.App
         /// <summary>Which cursor is wanted, out of what is going on in the game.</summary>
         private static Wanted Which()
         {
+            // Aiming comes before the rest: a skill being aimed is the thing the pointer is for, and
+            // the hand of a drag or the mark of a walk would say otherwise.
+            if (Time.unscaledTime < _aiming)
+            {
+                return Wanted.Skill;
+            }
+
             if (UiItemDrag.Carrying)
             {
                 return Wanted.Drag;

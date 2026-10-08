@@ -60,10 +60,17 @@ namespace Top.Client.App
 
         /// <summary>
         /// Plays an effect of the client's at a place, for as long as it is told to live. <br/>
-        /// Its pieces are laid out at once rather than thrown: a blow lands where it lands, and the
-        /// client's own skill effects are drawn at the mark rather than flown to it.
+        /// Its pieces are laid out at once rather than thrown: a blow leaves the hand when the gesture
+        /// reaches the frame for it, and the client's own skill effects are drawn where they start
+        /// rather than flown along the way.
+        /// <br/>
+        /// Given a way to face, the effect is turned to look down it - which is what makes a blow read as
+        /// leaving the hand that cast it: the pieces are laid around the place they start from and reach
+        /// out along the way they are going. Given a tail as well, a ribbon is drawn back along the way
+        /// it came, so that a chained blow is a chain of bodies joined one to the next.
         /// </summary>
-        public static SkillEffect Play(string name, Vector3 at, float length = 0.5f, Transform parent = null)
+        public static SkillEffect Play(string name, Vector3 at, float length = 0.5f, Transform parent = null,
+            Vector3? tail = null, Vector3? facing = null)
         {
             var file = Resources.Load<TextAsset>($"Effect/{name}");
 
@@ -92,10 +99,79 @@ namespace Top.Client.App
 
             effect._sheet = sheet;
             effect._length = Mathf.Max(length, 0.05f);
+            effect._tail = tail.HasValue ? tail.Value : at;
+            effect._facing = facing;
 
             effect.Build();
 
             return effect;
+        }
+
+        /// <summary>Where the effect comes from, which is where it sits when nothing else says.</summary>
+        private Vector3 _tail;
+
+        /// <summary>The way the effect is going, when something says - a blow leaving a hand.</summary>
+        private Vector3? _facing;
+
+        /// <summary>
+        /// The arc from where the blow came from to where it landed, made of one long piece through the
+        /// effect's own middle. <br/>
+        /// The effect's shapes are laid around its root and this reaches from the tail to the root, so it
+        /// reads as the bolt arriving - and it is the same art the effect already carries rather than a
+        /// second kind of thing drawn for the occasion.
+        /// </summary>
+        private void Arc(string texture)
+        {
+            var span = transform.position - _tail;
+
+            if (span.sqrMagnitude < 0.01f)
+            {
+                return;
+            }
+
+            // Across the way it goes, so that the ribbon faces the way a body does and not its own edge.
+            var across = Vector3.Cross(span.normalized, Vector3.up);
+
+            if (across.sqrMagnitude < 0.0001f)
+            {
+                across = Vector3.Cross(span.normalized, Vector3.forward);
+            }
+
+            across.Normalize();
+
+            var middle = (_tail + transform.position) * 0.5f;
+            var half = span.magnitude * 0.5f;
+            var wide = Mathf.Max(0.12f, span.magnitude * 0.06f);
+
+            var mesh = new Mesh { name = "Arc" };
+            var vertices = new[]
+            {
+                middle - (across * wide),
+                middle + (across * wide),
+                middle + (span.normalized * half) + (across * wide),
+                middle + (span.normalized * half) - (across * wide),
+                middle - (span.normalized * half) + (across * wide),
+                middle - (span.normalized * half) - (across * wide),
+            };
+
+            // Lengthwise along the ribbon, so the effect's sheet runs down it the way it runs down a
+            // piece that already has a length.
+            mesh.vertices = vertices;
+            mesh.uv = new[]
+            {
+                new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(1f, 1f), new Vector2(0f, 1f),
+                new Vector2(1f, 0f), new Vector2(0f, 0f),
+            };
+            mesh.triangles = new[] { 0, 1, 2, 0, 2, 3, 4, 5, 0, 4, 0, 1 };
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            var part = new GameObject("Arc").AddComponent<MeshFilter>();
+
+            part.transform.SetParent(transform, worldPositionStays: false);
+            part.sharedMesh = mesh;
+            part.gameObject.AddComponent<MeshRenderer>().sharedMaterial = Material(Resources.Load<Texture2D>($"Effect/{texture}"));
         }
 
         /// <summary>Builds one piece per shape the effect is made of, all under the effect's own root.</summary>
@@ -103,10 +179,22 @@ namespace Top.Client.App
         {
             var parts = new List<MeshFilter>();
 
+            // Turned before anything is laid out, so that the pieces, which are placed and turned in
+            // the effect's own space, come out along the way the blow is going rather than along the
+            // world's own axes. The client's effects reach out along their own forward.
+            if (_facing.HasValue && _facing.Value.sqrMagnitude > 0.0001f)
+            {
+                transform.rotation = Quaternion.LookRotation(_facing.Value.normalized, Vector3.up);
+            }
+
             foreach (var emitter in _sheet.emitters)
             {
                 parts.Add(Shape(emitter));
             }
+
+            // The way the blow came, drawn with the first sheet the effect carries, so that a bolt out of
+            // a hand reads as one thing with the mark it lands on.
+            Arc(parts.Count > 0 ? _sheet.emitters[0].texture : null);
 
             _parts = parts.ToArray();
         }

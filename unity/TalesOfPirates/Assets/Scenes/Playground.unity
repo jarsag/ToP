@@ -1254,6 +1254,7 @@ GameObject:
   - component: {fileID: 1959073041}
   - component: {fileID: 1959073044}
   - component: {fileID: 1959073045}
+  - component: {fileID: 1959073046}
   m_Layer: 0
   m_Name: Hero
   m_TagString: Untagged
@@ -1387,8 +1388,8 @@ MonoBehaviour:
   _move: 0003_05_run
   _warIdle: 0003_04_waiting2
   _warMove: 0003_06_run2
-  _skill: 0003_11_skill1
-  _skillHold: 0.9
+  _skill: 0003_337
+  _skillHold: 0
   _moveSpeed: 7
   _minRate: 0.6
   _maxRate: 1.5
@@ -1407,6 +1408,7 @@ MonoBehaviour:
   _glowDrift: {x: 0.02, y: 0.01}
   _glowCutoff: 0
   _glowSaturation: 1
+  _effectDummy: dummy_6
   _mountRight: dummy_9
   _mountLeft: dummy_6
   _backRight: dummy_21
@@ -1470,6 +1472,35 @@ MonoBehaviour:
   _scale: 0.9
   _fade: 0.5
   _overlap: 0.5
+--- !u!114 &1959073046
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1959073035}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6f230d80a8b418abadfcc89f41370a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Top.Client.App::Top.Client.App.SkillBar
+  _skills:
+  - name: Chain Lightning
+    effect: strhurt
+    effectLife: 0.5
+    damage: 100
+    range: 8
+    chainRange: 8
+    targets: 3
+    cooldown: 5
+    icon: s0214
+    clip: 0003_337
+    launch: 0.45
+  _key: 41
+  _slotSize: 52
+  _scale: 1
+  _camera: {fileID: 0}
+  _preview: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

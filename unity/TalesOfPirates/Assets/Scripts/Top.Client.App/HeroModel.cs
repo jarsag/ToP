@@ -85,8 +85,15 @@ namespace Top.Client.App
         /// </summary>
         [SerializeField] private string _skill = "0003_11_skill1";
 
-        /// <summary>How long the cast gesture holds before the hero goes back to what he was doing.</summary>
-        [SerializeField] private float _skillHold = 0.9f;
+        /// <summary>
+        /// How long the cast gesture holds before the hero goes back to what he was doing. <br/>
+        /// Zero or less holds it for the whole clip, which is what a gesture is meant to do, and the
+        /// clips are not the same length: the hero's three are 1.13s, 1.10s and 2.57s. A fixed hold
+        /// shorter than the clip cuts the gesture off part way - half a gesture, then a snap back to
+        /// standing - which is worse than no gesture at all.
+        /// </summary>
+        [Tooltip("How long the gesture holds. Zero or less holds it for the whole clip.")]
+        [SerializeField] private float _skillHold;
 
         /// <summary>
         /// How fast the hero moves while the move clip plays at its own speed.
@@ -189,6 +196,10 @@ namespace Top.Client.App
 
         private void Update()
         {
+            // The gesture of a cast throws its blow part way through, so it is looked at before
+            // anything that might change what is playing.
+            Gesture();
+
             if (_animations.Count == 0)
             {
                 return;
@@ -502,29 +513,213 @@ namespace Top.Client.App
         }
 
         /// <summary>
-        /// Makes the gesture of a cast. <br/>
+        /// Makes the gesture of a cast, and says where in the gesture the blow leaves the hand. <br/>
         /// It is a clip held rather than played and forgotten: a skill is cast from a standing start,
         /// and a hero who went straight back to walking would cut his own gesture off. The hold lets go
         /// of itself after the setting's own length - or at once, when no clip is named, which is what
         /// a hero with nothing to do with his hands does.
+        /// <br/>
+        /// The blow does not leave the hand when the key is pressed: the client kept the frame in its
+        /// animation data, and a coral leaves the hand when the arm is furthest forward, which is a
+        /// moment in the middle of the gesture and not its start. The setting is where in the gesture,
+        /// nought at the first frame and one at the last, and the effect is thrown when the clip reaches
+        /// it. A setting of nought - or no setting - throws it at once, as it did before.
         /// </summary>
-        public void Cast()
+        public void Cast(Action launch = null, float at = 0f)
         {
             if (string.IsNullOrEmpty(_skill))
+            {
+                launch?.Invoke();
+
+                return;
+            }
+
+            // The clip is started first and held afterwards, and the order matters: a held clip is a
+            // clip the hero has been told not to replace, and Play refuses to start anything at all
+            // while one is held. Holding first left the hero standing in whatever pose he was in, with
+            // no gesture played and nothing to see.
+            Play(_skill, 1f);
+
+            Holding = _skill;
+
+            // Held for the whole gesture unless the setting names a shorter moment, because a gesture
+            // cut off part way is worse than none: it snaps the hero back to standing mid-swing.
+            var hold = _skillHold > 0f ? _skillHold : Length(_skill);
+
+            CancelInvoke(nameof(LetGo));
+            Invoke(nameof(LetGo), Mathf.Max(hold, 0.05f));
+
+            _launch = launch;
+            _launchAt = Mathf.Clamp01(at);
+            _casting = Time.time;
+
+            // Said out loud because a gesture that does not play looks the same whether the clip is
+            // missing, held already, or playing on no part at all, and there is nothing else to go on.
+            Log.Info($"cast gesture '{_skill}': {Length(_skill):0.00}s long, held for "
+                     + $"{Mathf.Max(hold, 0.05f):0.00}s, playing on {Playing(_skill)} part(s) "
+                     + $"out of {_animations.Count}");
+        }
+
+        /// <summary>How long a clip is, or nought when no part of the hero carries it.</summary>
+        private float Length(string name)
+        {
+            var clip = Clip(name);
+
+            return clip != null ? clip.length : 0f;
+        }
+
+        /// <summary>How many parts of the hero carry a clip and are actually playing it.</summary>
+        private int Playing(string name)
+        {
+            var playing = 0;
+
+            foreach (var animation in _animations)
+            {
+                if (animation != null && animation.GetClip(name) != null && animation.IsPlaying(name))
+                {
+                    playing++;
+                }
+            }
+
+            return playing;
+        }
+
+        /// <summary>What waits to be thrown when the gesture reaches the frame that throws it.</summary>
+        private Action _launch;
+
+        private float _launchAt;
+
+        private float _casting;
+
+        /// <summary>
+        /// Throws the blow when the gesture has reached the frame the setting names. <br/>
+        /// Asked every frame while a gesture is being made, because the frame is a moment and not an
+        /// event: the clip is played by the animation component, and nothing tells this side of the
+        /// house when it passes a particular frame.
+        /// </summary>
+        private void Gesture()
+        {
+            if (_launch == null)
             {
                 return;
             }
 
-            Holding = _skill;
+            var clip = Clip(_skill);
 
-            Play(_skill, 1f);
+            if (clip == null || clip.length <= 0f)
+            {
+                return;
+            }
 
-            CancelInvoke(nameof(LetGo));
-            Invoke(nameof(LetGo), Mathf.Max(_skillHold, 0.05f));
+            var speed = 1f;
+
+            foreach (var animation in _animations)
+            {
+                var state = animation != null ? animation[_skill] : null;
+
+                if (state != null)
+                {
+                    speed = Mathf.Max(state.speed, 0.01f);
+
+                    break;
+                }
+            }
+
+            var through = (Time.time - _casting) / (clip.length / speed);
+
+            if (through < _launchAt)
+            {
+                return;
+            }
+
+            var launch = _launch;
+
+            _launch = null;
+
+            launch();
         }
 
-        /// <summary>Which clip a cast plays, for anything that wants to know.</summary>
-        public string SkillClip => _skill;
+        /// <summary>The clip of a name, out of the first place that has one.</summary>
+        private AnimationClip Clip(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            foreach (var animation in _animations)
+            {
+                var clip = animation != null ? animation.GetClip(name) : null;
+
+                if (clip != null)
+                {
+                    return clip;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Which clip a cast plays, for anything that wants to know - and for a skill that brings its own
+        /// gesture with it, since a hero's third skill and his first are different movements.
+        /// </summary>
+        public string SkillClip
+        {
+            get { return _skill; }
+            set { _skill = value; }
+        }
+
+        /// <summary>
+        /// The rig the hero is made of, which is where his clips come from. <br/>
+        /// Told rather than kept to itself because a skill brings its own gesture: whichever field names
+        /// that gesture has to be able to offer the same clips the hero does, and it can only do that by
+        /// knowing which rig they are in.
+        /// </summary>
+        public string RigPath => _rig;
+
+        /// <summary>
+        /// Where a skill's own effect starts, which is a dummy of the rig rather than the hero's middle:
+        /// a blow leaves the hand that makes it, and a bolt that grew out of the hero's chest would not
+        /// be the same thing at all. It is a setting because which dummy is the right one is the rig's
+        /// business - and a name nothing answers to falls back to the hero himself, so a scene that has
+        /// not been told still shows the effect.
+        /// </summary>
+        public Transform EffectFrom()
+        {
+            if (string.IsNullOrEmpty(_effectDummy))
+            {
+                return transform;
+            }
+
+            var found = Find(_effectDummy);
+
+            if (found == null)
+            {
+                // Said once rather than every frame, and said at all because a skill whose effect starts
+                // on the hero instead of in his hand looks like the effect is in the wrong place and
+                // gives nothing to go on.
+                if (!_missed)
+                {
+                    _missed = true;
+
+                    Log.Warning($"the effect dummy '{_effectDummy}' is not on the hero's rig, so his skill "
+                                + "effects start on him rather than in his hand");
+                }
+
+                return transform;
+            }
+
+            return found;
+        }
+
+        /// <summary>Whether the effect dummy has already been reported missing.</summary>
+        private bool _missed;
+
+        /// <summary>The dummy a skill's effect starts from, as a setting rather than a fixed name.</summary>
+        [Header("Skill")]
+        [Tooltip("Dummy the skill's effect starts from, by name. Empty starts it on the hero himself.")]
+        [SerializeField] private string _effectDummy = "dummy_6";
 
 
         /// <summary>
