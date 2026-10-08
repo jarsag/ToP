@@ -70,7 +70,8 @@ namespace Top.Client.App
         /// it came, so that a chained blow is a chain of bodies joined one to the next.
         /// </summary>
         public static SkillEffect Play(string name, Vector3 at, float length = 0.5f, Transform parent = null,
-            Vector3? tail = null, Vector3? facing = null)
+            Vector3? tail = null, Vector3? facing = null, float width = 0f, float thickness = 0.15f,
+            bool stretch = false, float? over = null)
         {
             var file = Resources.Load<TextAsset>($"Effect/{name}");
 
@@ -101,6 +102,10 @@ namespace Top.Client.App
             effect._length = Mathf.Max(length, 0.05f);
             effect._tail = tail.HasValue ? tail.Value : at;
             effect._facing = facing;
+            effect._width = width;
+            effect._thickness = thickness;
+            effect._stretch = stretch;
+            effect._over = over;
 
             effect.Build();
 
@@ -112,6 +117,18 @@ namespace Top.Client.App
 
         /// <summary>The way the effect is going, when something says - a blow leaving a hand.</summary>
         private Vector3? _facing;
+
+        /// <summary>How wide the ribbon is, as a share of how far it reaches.</summary>
+        private float _width;
+
+        /// <summary>The width the ribbon falls back to when no share is named.</summary>
+        private float _thickness = 0.15f;
+
+        /// <summary>Whether the effect is cut to the distance it is thrown over.</summary>
+        private bool _stretch;
+
+        /// <summary>How far the blow was thrown, when something says - which is what it is cut to.</summary>
+        private float? _over;
 
         /// <summary>
         /// The arc from where the blow came from to where it landed, made of one long piece through the
@@ -141,7 +158,13 @@ namespace Top.Client.App
 
             var middle = (_tail + transform.position) * 0.5f;
             var half = span.magnitude * 0.5f;
-            var wide = Mathf.Max(0.12f, span.magnitude * 0.06f);
+
+            // How wide the ribbon is: a share of how far it reaches when one is named, and a thin fixed
+            // width otherwise. The client's art is a road rather than a bolt, so a ribbon drawn to its
+            // own proportions is a slab.
+            var wide = _width > 0f
+                ? Mathf.Max(0.02f, span.magnitude * _width)
+                : Mathf.Max(0.02f, _thickness);
 
             var mesh = new Mesh { name = "Arc" };
             var vertices = new[]
@@ -192,11 +215,69 @@ namespace Top.Client.App
                 parts.Add(Shape(emitter));
             }
 
+            Cut();
+
             // The way the blow came, drawn with the first sheet the effect carries, so that a bolt out of
             // a hand reads as one thing with the mark it lands on.
             Arc(parts.Count > 0 ? _sheet.emitters[0].texture : null);
 
             _parts = parts.ToArray();
+        }
+
+        /// <summary>
+        /// How far the art reaches along its own forward, out of the shapes it is made of. <br/>
+        /// The client's pieces are laid around the place they start and stretch away from it, so the
+        /// furthest of them is how far the whole thing reaches - seven and eight metres for this effect,
+        /// whose pieces are roads rather than bolts.
+        /// </summary>
+        private float Reach()
+        {
+            var furthest = 0.5f;
+
+            foreach (var emitter in _sheet.emitters)
+            {
+                var size = Way(emitter.size, 1f);
+
+                if (size.z > furthest)
+                {
+                    furthest = size.z;
+                }
+            }
+
+            return furthest;
+        }
+
+        /// <summary>
+        /// Cuts the effect to the distance it was thrown over, so that a blow landing two metres away
+        /// ends there instead of running eight metres out the back of the body it hit. <br/>
+        /// Only the length is cut: a piece stretched sideways or upwards as well would change shape, and
+        /// what is wanted is the same bolt over a shorter way. The distance is the one the blow was
+        /// aimed over, handed in rather than worked out here - where the effect starts says nothing about
+        /// where it was meant to land.
+        /// </summary>
+        private void Cut()
+        {
+            if (!_stretch || !_over.HasValue)
+            {
+                return;
+            }
+
+            var over = _over.Value;
+
+            if (over < 0.05f)
+            {
+                return;
+            }
+
+            var reach = Reach();
+
+            // Never longer than the art's own reach: a blow thrown further than the art can go is drawn
+            // at its full length rather than stretched into something the client never drew.
+            var share = Mathf.Min(over / reach, 1f);
+
+            // Never so short that nothing is left: a blow landing on the caster's own boots still has to
+            // be drawn as something.
+            transform.localScale = new Vector3(1f, 1f, Mathf.Max(share, 0.05f));
         }
 
         private MeshFilter Shape(Emitter emitter)

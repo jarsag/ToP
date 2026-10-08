@@ -1488,9 +1488,12 @@ MonoBehaviour:
   - name: Chain Lightning
     effect: strhurt
     effectLife: 0.5
+    effectWidth: 0.03
+    effectThickness: 0.15
+    effectStretch: 1
     damage: 100
     range: 8
-    chainRange: 8
+    chainRange: 2
     targets: 3
     cooldown: 5
     icon: s0214
@@ -1500,7 +1503,7 @@ MonoBehaviour:
   _slotSize: 52
   _scale: 1
   _camera: {fileID: 0}
-  _preview: {fileID: 0}
+  _preview: {fileID: 1014006409}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

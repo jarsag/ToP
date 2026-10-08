@@ -24,6 +24,26 @@ namespace Top.Client.App
         /// <summary>How long each body wears the effect for.</summary>
         public float effectLife = 0.5f;
 
+        /// <summary>
+        /// How wide the ribbon between one body and the next is, as a share of how far it reaches. <br/>
+        /// The client's own art is a road rather than a bolt - the pieces of this effect are seven and
+        /// eight metres long along the way they go - so a ribbon drawn to its own proportions reads as a
+        /// slab. Nought or less leaves a thin fixed width instead.
+        /// </summary>
+        [Range(0f, 0.3f)] public float effectWidth = 0.03f;
+
+        /// <summary>The width the ribbon falls back to when no share is named, in metres.</summary>
+        public float effectThickness = 0.15f;
+
+        /// <summary>
+        /// Whether the effect is cut to the distance it is thrown over. <br/>
+        /// The art reaches about eight metres along its own forward, which is right for a thing thrown
+        /// into the distance and wrong for a blow that lands two metres away: the pieces run past the
+        /// body and out the other side. Cut to the distance, they end where the body is. Turning it off
+        /// leaves the effect its own length.
+        /// </summary>
+        public bool effectStretch = true;
+
         public int damage = 100;
 
         /// <summary>How far it reaches for its first body.</summary>
@@ -201,9 +221,16 @@ namespace Top.Client.App
 
                 // Where it starts, the way it is going, and - for everything after the first - the way
                 // it came, so that the bodies read as one chain and not as a handful of separate blows.
+                // The width and the reach are the skill's own settings: the client's art is a road seven
+                // or eight metres long, which is right for a thing thrown into the distance and wrong for
+                // a blow that lands two metres away - it runs out the back of the body it hits.
                 SkillEffect.Play(skill.effect, from, skill.effectLife, null,
                     i == 0 ? (Vector3?)null : from,
-                    way.sqrMagnitude > 0.0001f ? way : (Vector3?)null);
+                    way.sqrMagnitude > 0.0001f ? way : (Vector3?)null,
+                    skill.effectWidth,
+                    skill.effectThickness,
+                    skill.effectStretch,
+                    way.magnitude);
 
                 body.Strike(skill.damage);
             }
